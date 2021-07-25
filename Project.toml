@@ -14,3 +14,6 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 WavePropBase = "91c5bd54-65f5-4719-ae3b-9579edfc4a0b"
+
+[compat]
+QuadGK = "2"
