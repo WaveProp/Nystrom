@@ -39,7 +39,7 @@ of type `T`. Threads are used to speed up computations.
 function pseudoblockmatrix(op::IntegralOperator{T}) where T
     imax, jmax = size(op)
     psmatrix = pseudoblockmatrix(T, imax, jmax)
-    for j in 1:jmax
+    Threads.@threads for j in 1:jmax
         for i in 1:imax
             @inbounds psmatrix[Block(i, j)] = op[i, j]
         end
