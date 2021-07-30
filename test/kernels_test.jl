@@ -9,8 +9,8 @@ using LinearAlgebra
     dG    = DoubleLayerKernel(pde)
     @test Nystrom.kernel_type(G) == Nystrom.SingleLayer()
     @test Nystrom.kernel_type(dG) == Nystrom.DoubleLayer()
-    @test Nystrom.return_type(G) == ComplexF64
-    @test Nystrom.return_type(dG) == ComplexF64
+    @test Nystrom.return_type(G) == SMatrix{1,1,ComplexF64,1}
+    @test Nystrom.return_type(dG) == SMatrix{1,1,ComplexF64,1}
     @test Nystrom.combined_field_coefficients(G) == (0,-1)
     @test Nystrom.combined_field_coefficients(dG) == (1,0)
 
@@ -19,8 +19,8 @@ using LinearAlgebra
     dG    = DoubleLayerKernel(pde)
     @test Nystrom.kernel_type(G) == Nystrom.SingleLayer()
     @test Nystrom.kernel_type(dG) == Nystrom.DoubleLayer()
-    @test Nystrom.return_type(G) == Float64
-    @test Nystrom.return_type(dG) == Float64
+    @test Nystrom.return_type(G) == SMatrix{1,1,Float64,1}
+    @test Nystrom.return_type(dG) == SMatrix{1,1,Float64,1}
     @test Nystrom.combined_field_coefficients(G) == (0,-1)
     @test Nystrom.combined_field_coefficients(dG) == (1,0)
 

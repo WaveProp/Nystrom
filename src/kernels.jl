@@ -117,8 +117,8 @@ function Base.show(io::IO,pde::Laplace)
     print(io,"Δu = 0")
 end
 
-default_kernel_eltype(::Laplace)  = Float64
-default_density_eltype(::Laplace) = Float64
+default_kernel_eltype(::Laplace)  = SMatrix{1,1,Float64,1}
+default_density_eltype(::Laplace) = SVector{1,Float64}
 
 function (SL::SingleLayerKernel{T,Laplace{N}})(target,source)::T  where {N,T}
     x = coords(target)
@@ -127,9 +127,9 @@ function (SL::SingleLayerKernel{T,Laplace{N}})(target,source)::T  where {N,T}
     d = norm(r)
     d == 0 && (return zero(T))
     if N==2
-        return -1/(2π)*log(d)
+        return (-1/(2π)*log(d)) |> T
     elseif N==3
-        return 1/(4π)/d
+        return (1/(4π)/d) |> T
     else
         notimplemented()
     end
@@ -143,9 +143,9 @@ function (DL::DoubleLayerKernel{T,Laplace{N}})(target,source)::T where {N,T}
     d = norm(r)
     d == 0 && (return zero(T))
     if N == 2
-        return 1/(2π)/(d^2) .* dot(r,ny)
+        return (1/(2π)/(d^2) .* dot(r,ny)) |> T
     elseif N==3
-        return 1/(4π)/(d^3) .* dot(r,ny)
+        return (1/(4π)/(d^3) .* dot(r,ny)) |> T
     else
         notimplemented()
     end
@@ -159,9 +159,9 @@ function (ADL::AdjointDoubleLayerKernel{T,Laplace{N}})(target,source)::T where {
     d = norm(r)
     d == 0 && (return zero(T))
     if N==2
-        return -1/(2π)/(d^2) .* dot(r,nx)
+        return (-1/(2π)/(d^2) .* dot(r,nx)) |> T
     elseif N==3
-        return -1/(4π)/(d^3) .* dot(r,nx)
+        return (-1/(4π)/(d^3) .* dot(r,nx)) |> T
     end
 end
 
@@ -176,11 +176,11 @@ function (HS::HyperSingularKernel{T,Laplace{N}})(target,source)::T where {N,T}
     if N==2
         ID = SMatrix{2,2,Float64,4}(1,0,0,1)
         RRT = r*transpose(r) # r ⊗ rᵗ
-        return 1/(2π)/(d^2) * transpose(nx)*(( ID -2*RRT/d^2  )*ny)
+        return (1/(2π)/(d^2) * transpose(nx)*(( ID -2*RRT/d^2  )*ny)) |> T
     elseif N==3
         ID = SMatrix{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
         RRT = r*transpose(r) # r ⊗ rᵗ
-        return 1/(4π)/(d^3) * transpose(nx)*(( ID -3*RRT/d^2  )*ny)
+        return (1/(4π)/(d^3) * transpose(nx)*(( ID -3*RRT/d^2  )*ny)) |> T
     end
 end
 
@@ -206,8 +206,8 @@ end
 
 parameters(pde::Helmholtz) = pde.k
 
-default_kernel_eltype(::Helmholtz)  = ComplexF64
-default_density_eltype(::Helmholtz) = ComplexF64
+default_kernel_eltype(::Helmholtz)  = SMatrix{1,1,ComplexF64,1}
+default_density_eltype(::Helmholtz) = SVector{1,ComplexF64}
 
 function (SL::SingleLayerKernel{T,S})(target, source)::T where {T,S <: Helmholtz}
     x = coords(target)
@@ -218,9 +218,9 @@ function (SL::SingleLayerKernel{T,S})(target, source)::T where {T,S <: Helmholtz
     d = norm(r)
     d == 0 && (return zero(T))
     if N == 2
-        return im / 4 * hankelh1(0, k * d)
+        return (im / 4 * hankelh1(0, k * d)) |> T
     elseif N == 3
-        return 1 / (4π) / d * exp(im * k * d)
+        return (1 / (4π) / d * exp(im * k * d)) |> T
     end
 end
 
@@ -233,9 +233,9 @@ function (DL::DoubleLayerKernel{T,S})(target, source)::T where {T,S <: Helmholtz
     d = norm(r)
     d == 0 && (return zero(T))
     if N == 2
-        return im * k / 4 / d * hankelh1(1, k * d) .* dot(r, ny)
+        return (im * k / 4 / d * hankelh1(1, k * d) .* dot(r, ny)) |> T
     elseif N == 3
-        return 1 / (4π) / d^2 * exp(im * k * d) * ( -im * k + 1 / d ) * dot(r, ny)
+        return (1 / (4π) / d^2 * exp(im * k * d) * ( -im * k + 1 / d ) * dot(r, ny)) |> T
     end
 end
 
@@ -248,9 +248,9 @@ function (ADL::AdjointDoubleLayerKernel{T,S})(target, source)::T where {T,S <: H
     d = norm(r)
     d == 0 && (return zero(T))
     if N == 2
-        return -im * k / 4 / d * hankelh1(1, k * d) .* dot(r, nx)
+        return (-im * k / 4 / d * hankelh1(1, k * d) .* dot(r, nx)) |> T
     elseif N == 3
-        return -1 / (4π) / d^2 * exp(im * k * d) * ( -im * k + 1 / d ) * dot(r, nx)
+        return (-1 / (4π) / d^2 * exp(im * k * d) * ( -im * k + 1 / d ) * dot(r, nx)) |> T
     end
 end
 
@@ -265,12 +265,12 @@ function (HS::HyperSingularKernel{T,S})(target, source)::T where {T,S <: Helmhol
     if N == 2
         RRT = r * transpose(r) # r ⊗ rᵗ
         # TODO: rewrite the operation below in a more clear/efficient way
-        return transpose(nx) * ((-im * k^2 / 4 / d^2 * hankelh1(2, k * d) * RRT + im * k / 4 / d * hankelh1(1, k * d) * I) * ny)
+        return (transpose(nx) * ((-im * k^2 / 4 / d^2 * hankelh1(2, k * d) * RRT + im * k / 4 / d * hankelh1(1, k * d) * I) * ny)) |> T
     elseif N == 3
         RRT   = r * transpose(r) # r ⊗ rᵗ
         term1 = 1 / (4π) / d^2 * exp(im * k * d) * ( -im * k + 1 / d ) * I
         term2 = RRT / d * exp(im * k * d) / (4 * π * d^4) * (3 * (d * im * k - 1) + d^2 * k^2)
-        return  transpose(nx) * (term1 + term2) * ny
+        return  (transpose(nx) * (term1 + term2) * ny) |> T
     end
 end
 

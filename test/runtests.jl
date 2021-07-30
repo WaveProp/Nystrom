@@ -10,4 +10,4 @@ using SafeTestsets
 
 @safetestset "Integral operators" begin include("integraloperator_test.jl") end
 
-@safetestset "Density interoplation method" begin include("dim_test.jl") end
+@safetestset "Density interpolation method" begin include("dim_test.jl") end
