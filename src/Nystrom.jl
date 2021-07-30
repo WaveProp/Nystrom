@@ -8,6 +8,7 @@ using IterativeSolvers
 using SpecialFunctions
 using QuadGK
 using RecipesBase
+using BlockArrays
 
 # packages to generate the geometry
 using GmshSDK
@@ -62,11 +63,12 @@ WavePropBase.@export_interface
 include("utils.jl")
 include("nystrommesh.jl")
 include("kernels.jl")
-include("density.jl")
 include("potential.jl")
 include("integraloperator.jl")
 include("lebedevpoints.jl")
 include("dim.jl")
 include("gausskronrod.jl")
+include("blockmatrices.jl")
+include("density.jl")
 
 end # module

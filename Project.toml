@@ -4,6 +4,7 @@ authors = ["Luiz M. Faria <maltezfaria@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 GmshSDK = "357176ee-4fc2-4a7a-b2e3-8358239da070"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
