@@ -201,7 +201,7 @@ end
 function _singular_weights_dim_maxwell(iop::IntegralOperator,γ₀B,γ₁B,R,dict_near)
     X,Y = target_surface(iop), source_surface(iop)
     T   = eltype(iop)
-    num_basis = size(γ₀B,2)
+    num_basis = blocksize(γ₀B,2)
     a,b = combined_field_coefficients(iop)
     # we now have the residue R. For the correction we need the coefficients.
     Is = Int[]
@@ -213,7 +213,7 @@ function _singular_weights_dim_maxwell(iop::IntegralOperator,γ₀B,γ₁B,R,dic
         num_qnodes, num_els   = size(el2qnodes)
         T2 = SMatrix{2,3,ComplexF64,6}
         T3 = SMatrix{3,2,ComplexF64,6}
-        M                     = Matrix{T2}(undef,2*num_qnodes,num_basis)
+        M                     = pseudoblockmatrix(T2, 2*num_qnodes,num_basis)
         @assert length(list_near) == num_els
         for n in 1:num_els
             j_glob                = @view el2qnodes[:,n]
@@ -221,26 +221,27 @@ function _singular_weights_dim_maxwell(iop::IntegralOperator,γ₀B,γ₁B,R,dic
                 for k in 1:num_qnodes
                     # J,_ = jacobian(qnodes[j_glob[k]]) |> qr
                     J = jacobian(qnodes[j_glob[k]])
-                    M[k,p]            = transpose(J)*γ₀B[j_glob[k],p]
-                    M[num_qnodes+k,p] = transpose(J)*γ₁B[j_glob[k],p]
+                    M[Block(k,p)]            = transpose(J)*γ₀B[Block(j_glob[k],p)]
+                    M[Block(num_qnodes+k,p)] = transpose(J)*γ₁B[Block(j_glob[k],p)]
                 end
             end
-            M_mat                 = blockmatrix_to_matrix(M)
+            M_mat = to_matrix(M)
             @debug begin
                 if minimum(size(M_mat)) > rank(M_mat)
                     @info size(M_mat), rank(M_mat)
                 end
             end
-            F                     = qr!(M_mat)
+            F = qr!(M_mat)
             for (i,_) in list_near[n]
-                tmp_scalar  = (blockmatrix_to_matrix(R[i:i,:])/F.R)*adjoint(F.Q)
-                tmp         = matrix_to_blockmatrix(tmp_scalar,T3)
-                tmp         = axpby!(a,view(tmp,1:num_qnodes),b,view(tmp,(num_qnodes+1):(2*num_qnodes)))
+                tmp_scalar = (to_matrix(R[Block(i),Block.(1:num_basis)])/F.R)*adjoint(F.Q)
+                tmp = pseudoblockmatrix(tmp_scalar, T3)  # blocksize(tmp) = (1,2*num_qnodes)
+                tmp2 = axpby!(a,view(tmp,Block(1),Block.(1:num_qnodes)),
+                              b,view(tmp,Block(1),Block.((num_qnodes+1):(2*num_qnodes))))
                 w = Vector{T}(undef,num_qnodes)
                 for k in 1:num_qnodes
                     # J,_ = jacobian(qnodes[j_glob[k]]) |> qr
                     J = jacobian(qnodes[j_glob[k]])
-                    w[k] = tmp[k]*transpose(J)
+                    w[k] = tmp2[Block(1,k)]*transpose(J)
                 end
                 append!(Is,fill(i,num_qnodes))
                 append!(Js,j_glob)
@@ -248,8 +249,8 @@ function _singular_weights_dim_maxwell(iop::IntegralOperator,γ₀B,γ₁B,R,dic
             end
         end
     end
-    Sp = sparse(Is,Js,Vs,size(iop)...)
-    return Sp
+    #Sp = sparse(Is,Js,Vs,size(iop)...)
+    return Is, Js, Vs
 end
 
 function _source_gen(iop::IntegralOperator,kfactor=5)
