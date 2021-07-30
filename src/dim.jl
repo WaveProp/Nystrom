@@ -1,4 +1,4 @@
-function assemble_dim(iop::IntegralOperator;compress=Matrix,location=:onsurface)
+function assemble_dim(iop::IntegralOperator;compress=pseudoblockmatrix,location=:onsurface)
     X    = target_surface(iop)
     Y    = source_surface(iop)
     pde  = iop.kernel.pde
@@ -16,7 +16,7 @@ function assemble_dim(iop::IntegralOperator;compress=Matrix,location=:onsurface)
     end
 end
 
-function single_doublelayer_dim(pde,X,Y=X;compress=Matrix,location=:onsurface)
+function single_doublelayer_dim(pde,X,Y=X;compress=pseudoblockmatrix,location=:onsurface)
     msg = "unrecognized value for kw `location`: received $location.
            Valid options are `:onsurface`, `:inside` and `:outside`."
     σ = location === :onsurface ? -0.5 : location === :inside ? 0 : location === :outside ? -1 : error(msg)
@@ -40,14 +40,23 @@ function single_doublelayer_dim(pde,X,Y=X;compress=Matrix,location=:onsurface)
         δD = _singular_weights_dim(Dop,γ₀B,γ₁B,R,dict_near)
     end
     # add corrections to the dense part
-    axpy!(true,δS,S)
-    axpy!(true,δD,D)
+    _add_corrections!(S, δS)
+    _add_corrections!(D, δD)
     return S,D
 end
 singlelayer_dim(args...;kwargs...) = single_doublelayer_dim(args...;kwargs...)[1]
 doublelayer_dim(args...;kwargs...) = single_doublelayer_dim(args...;kwargs...)[2]
+function _add_corrections!(op, δop)
+    Is, Js, Vs = δop
+    Threads.@threads for n in 1:length(Is)
+        i = Is[n]
+        j = Js[n] 
+        v = Vs[n] 
+        op[Block(i,j)] += v
+    end
+end
 
-function adjointdoublelayer_hypersingular_dim(pde,X,Y=X;compress=Matrix,location=:onsurface)
+function adjointdoublelayer_hypersingular_dim(pde,X,Y=X;compress=pseudoblockmatrix,location=:onsurface)
     msg = "unrecognized value for kw `location`: received $location.
     Valid options are `:onsurface`, `:inside` and `:outside`."
     σ = location === :onsurface ? -0.5 : location === :inside ? 0 : location === :outside ? -1 : error(msg)
@@ -64,15 +73,15 @@ function adjointdoublelayer_hypersingular_dim(pde,X,Y=X;compress=Matrix,location
     δK        = _singular_weights_dim(Kop,γ₀B,γ₁B,R,dict_near)
     δH        = _singular_weights_dim(Hop,γ₀B,γ₁B,R,dict_near)
     # add corrections to the dense part
-    axpy!(true,δK,K)
-    axpy!(true,δH,H)
+    _add_corrections!(K, δK)
+    _add_corrections!(H, δH)
     return K,H
 end
 adjointdoublelayer_dim(args...;kwargs...)  = adjointdoublelayer_hypersingular_dim(args...;kwargs...)[1]
 hypersingular_dim(args...;kwargs...)       = adjointdoublelayer_hypersingular_dim(args...;kwargs...)[2]
 
 
-function singular_weights_dim(iop::IntegralOperator,compress=Matrix)
+function singular_weights_dim(iop::IntegralOperator,compress=pseudoblockmatrix)
     X,Y,op = iop.X, iop.Y, iop.kernel.op
     σ = X == Y ? -0.5 : 0.0
     #
@@ -90,12 +99,12 @@ function _auxiliary_quantities_dim(iop,Op1,Op2,basis,γ₁_basis,σ)
     nbasis = length(basis)
     # compute matrix of basis evaluated on Y
     ynodes   = dofs(Y)
-    γ₀B      = Matrix{T}(undef,length(ynodes),nbasis)
-    γ₁B      = Matrix{T}(undef,length(ynodes),nbasis)
+    γ₀B      = pseudoblockmatrix(T, length(ynodes), nbasis)
+    γ₁B      = pseudoblockmatrix(T, length(ynodes), nbasis)
     for k in 1:nbasis
         for i in 1:length(ynodes)
-            γ₀B[i,k] = basis[k](ynodes[i])
-            γ₁B[i,k] = γ₁_basis[k](ynodes[i])
+            γ₀B[Block(i,k)] = basis[k](ynodes[i])
+            γ₁B[Block(i,k)] = γ₁_basis[k](ynodes[i])
         end
     end
     # integrate the basis over Y
@@ -106,7 +115,7 @@ function _auxiliary_quantities_dim(iop,Op1,Op2,basis,γ₁_basis,σ)
         if σ !== 0
             for k in 1:nbasis
                 for i in 1:length(xnodes)
-                    R[i,k] += σ*basis[k](xnodes[i])
+                    R[Block(i,k)] += σ*basis[k](xnodes[i])
                 end
             end
         end
@@ -114,7 +123,7 @@ function _auxiliary_quantities_dim(iop,Op1,Op2,basis,γ₁_basis,σ)
         if σ !== 0
             for k in 1:nbasis
                 for i in 1:length(xnodes)
-                    R[i,k] += σ*γ₁_basis[k](xnodes[i])
+                    R[Block(i,k)] += σ*γ₁_basis[k](xnodes[i])
                 end
             end
         end
@@ -147,7 +156,8 @@ end
 function _singular_weights_dim(iop::IntegralOperator,γ₀B,γ₁B,R,dict_near)
     X,Y = target_surface(iop), source_surface(iop)
     T   = eltype(iop)
-    num_basis = size(γ₀B,2)
+    @assert all(m isa PseudoBlockArray for m in (γ₀B,γ₁B,R))
+    num_basis = blocksize(γ₀B,2)
     a,b = combined_field_coefficients(iop)
     # we now have the residue R. For the correction we need the coefficients.
     Is = Int[]
@@ -156,39 +166,36 @@ function _singular_weights_dim(iop::IntegralOperator,γ₀B,γ₁B,R,dict_near)
     for (E,list_near) in dict_near
         el2qnodes = elt2dof(Y,E)
         num_qnodes, num_els   = size(el2qnodes)
-        M                     = Matrix{T}(undef,2*num_qnodes,num_basis)
+        M                     = pseudoblockmatrix(T, 2*num_qnodes,num_basis)
         @assert length(list_near) == num_els
         for n in 1:num_els
             j_glob                = @view el2qnodes[:,n]
-            M[1:num_qnodes,:]     = @view γ₀B[j_glob,:]
-            M[num_qnodes+1:end,:] = @view γ₁B[j_glob,:]
-            # distinguish scalar and vectorial case
-            if T <: Number
-                F                     = qr(M)
-            elseif T <: SMatrix
-                M_mat = blockmatrix_to_matrix(M)
-                F                     = qr!(M_mat)
-            else
-                error("unknown element type T=$T")
-            end
+            _assemble_interpolant_matrix!(M, γ₀B, γ₁B, j_glob, num_qnodes, num_basis)  # assemble M
+            F = M |> to_matrix |> qr!
             for (i,_) in list_near[n]
-                if T <: Number
-                    tmp = ((R[i:i,:])/F.R)*adjoint(F.Q)
-                elseif T <: SMatrix
-                    tmp_scalar  = (blockmatrix_to_matrix(R[i:i,:])/F.R)*adjoint(F.Q)
-                    tmp  = matrix_to_blockmatrix(tmp_scalar,T)
-                else
-                    error("unknown element type T=$T")
-                end
-                w    = axpby!(a,view(tmp,1:num_qnodes),b,view(tmp,(num_qnodes+1):(2*num_qnodes)))
+                tmp_scalar = (to_matrix(R[Block(i),Block.(1:num_basis)])/F.R)*adjoint(F.Q)
+                tmp = pseudoblockmatrix(tmp_scalar, T)  # blocksize(tmp) = (1,2*num_qnodes)
+                w = axpby!(a,view(tmp,Block(1),Block.(1:num_qnodes)),
+                           b,view(tmp,Block(1),Block.((num_qnodes+1):(2*num_qnodes))))
                 append!(Is,fill(i,num_qnodes))
                 append!(Js,j_glob)
-                append!(Vs,w)
+                for l in 1:num_qnodes
+                    push!(Vs, view(w, Block(1,l)))
+                end
             end
         end
     end
-    Sp = sparse(Is,Js,Vs,size(iop)...)
-    return Sp
+    #Sp = sparse(Is,Js,Vs,size(iop)...)
+    return Is, Js, Vs
+end
+function _assemble_interpolant_matrix!(M, γ₀B, γ₁B, j_glob, num_qnodes, num_basis)
+    for n in 1:num_basis
+        for j in 1:num_qnodes
+            global_j = j_glob[j]
+            M[Block(j, n)] = γ₀B[Block(global_j,n)]
+            M[Block(j+num_qnodes, n)] = γ₁B[Block(global_j,n)]
+        end
+    end
 end
 
 function _singular_weights_dim_maxwell(iop::IntegralOperator,γ₀B,γ₁B,R,dict_near)

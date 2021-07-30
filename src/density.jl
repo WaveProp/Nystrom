@@ -42,6 +42,15 @@ Base.:/(σ::Density,a::Number) = Density(σ.vals/a,σ.mesh)
 Base.:*(A::Matrix,σ::Density) = Density(A*σ.vals,σ.mesh)
 Base.:*(A::Diagonal,σ::Density) = Density(A*σ.vals,σ.mesh)
 
+function Base.:*(A::PseudoBlockArray,σ::Density{V}) where {V<:SVector}
+    T = eltype(V)
+    σ_vec = reinterpret(T, σ.vals)
+    Amat = to_matrix(A)   # from PseudoBlockArray to contiguous Matrix
+    vals_vec = Amat*σ_vec
+    vals = reinterpret(V, vals_vec) |> collect
+    return Density(vals, σ.mesh)
+end
+
 function Base.:\(A::AbstractMatrix{T},σ::Density{V}) where {T,V}
     @assert size(A,1) == size(A,2)
     if T <: Number && V <: Number
