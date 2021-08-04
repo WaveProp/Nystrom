@@ -50,7 +50,7 @@ for n in [4,8,12]
     S,D   = Nystrom.single_doublelayer_dim(pde,mesh;n_src=n_src)
     N,J,dualJ = Nystrom.ncross_and_jacobian_matrices(mesh)
 
-    L     = Nystrom.assemble_dim_nystrom_matrix(mesh, α, β, D, S, exterior=true)
+    L     = Nystrom.assemble_dim_nystrom_matrix(mesh, α, β, D, S)
     rhs   = dualJ*γ₀E
     if iterative
         ϕ_coeff = copy(rhs)
