@@ -70,5 +70,7 @@ include("blockmatrices.jl")
 include("dim.jl")
 include("gausskronrod.jl")
 include("density.jl")
+include("maxwellCFIE.jl")
+include("maxwellCFIE_dim.jl")
 
 end # module
