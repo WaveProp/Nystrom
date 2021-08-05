@@ -41,7 +41,7 @@ n_src = 50         # number of interpolant sources
 qorder = 5         # quadrature order 1D
 ndofs = Float64[]
 errs = Float64[]
-iterative = false;
+iterative = true;
 ##
 for n in [4,8,12]
     M     = meshgen(Γ,(n,n))
@@ -50,15 +50,16 @@ for n in [4,8,12]
     S,D   = Nystrom.single_doublelayer_dim(pde,mesh;n_src=n_src)
     N,J,dualJ = Nystrom.ncross_and_jacobian_matrices(mesh)
 
+    @info "Assembling matrix..."
     L     = Nystrom.assemble_dim_nystrom_matrix(mesh, α, β, D, S)
+    @info "Solving..."
     rhs   = dualJ*γ₀E
     if iterative
-        ϕ_coeff = copy(rhs)
-        gmres!(ϕ_coeff,L,rhs;verbose=true,maxiter=600,restart=600,abstol=1e-6)
+        ϕ_coeff = Density(Nystrom.solve_GMRES(L, rhs;verbose=true,maxiter=600,restart=600,abstol=1e-6), mesh)
     else
-        ϕ_coeff = reinterpret(SVector{2,ComplexF64}, L\reinterpret(ComplexF64, rhs)) 
+        ϕ_coeff = Density(Nystrom.solve_LU(L, rhs), mesh)
     end
-    ϕ     = Density(J*ϕ_coeff, mesh)
+    ϕ     = J*ϕ_coeff
     Spot  = Nystrom.maxwellCFIE_SingleLayerPotencial(pde, mesh)
     Dpot  = Nystrom.maxwellCFIE_DoubleLayerPotencial(pde, mesh)
     Eₐ    = (x) -> α*Dpot(ϕ,x) + β*Spot(ncross(ϕ),x)

@@ -120,3 +120,32 @@ function assemble_dim_nystrom_matrix(mesh, α, β, D::T, S::T) where T<:PseudoBl
     M .= dualJm*(0.5*α*I + α*Dm + β*Sm*Nm)*Jm
     return M
 end
+
+function assemble_dim_nystrom_matrix_Luiz(mesh, α, β, D::T, S::T) where T<:PseudoBlockMatrix
+    N, J, dualJ = ncross_and_jacobian_matrices(mesh)
+    Jm = diagonalblockmatrix_to_matrix(J.diag)
+    dualJm = diagonalblockmatrix_to_matrix(dualJ.diag)
+    Nm = diagonalblockmatrix_to_matrix(N.diag)
+    Sm = to_matrix(S)
+    Dm = to_matrix(D)
+    n_qnodes = length(dofs(mesh))
+    M = Matrix{ComplexF64}(undef, 2*n_qnodes, 2*n_qnodes)
+    M .= dualJm*(0.5*α*I + Nm*(-α*Dm + β*Sm)*Nm)*Jm
+    return M
+end
+
+function solve_LU(A::Matrix{ComplexF64}, σ::AbstractVector{V}) where {V}
+    Amat    = A
+    σ_vec   = reinterpret(eltype(V),σ)
+    vals_vec = Amat\σ_vec
+    vals    = reinterpret(V,vals_vec) |> collect
+    return vals
+end
+
+function solve_GMRES(A::Matrix{ComplexF64}, σ::AbstractVector{V}, args...; kwargs...) where {V}
+    σ_vec   = reinterpret(eltype(V),σ)
+    vals_vec = copy(σ_vec)
+    gmres!(vals_vec, A, σ_vec, args...; kwargs...)
+    vals = reinterpret(V,vals_vec) |> collect
+    return vals
+end
