@@ -191,3 +191,40 @@ function assemble_direct_nystrom(pde, mesh, η, D::PseudoBlockMatrix, S::PseudoB
     M = dualJm*(η*im*k*Nm*Sm + (1-η)*(0.5I + Dm))*Jm
     return M
 end
+
+function blockdiag_preconditioner(mesh, L)
+    n_qnodes = length(dofs(mesh))
+    n_dof = size(L, 1)
+    dof_per_qnode = n_dof / n_qnodes
+    @assert n_dof % n_qnodes == 0
+    # Boolean mask
+    Is = Int64[]
+    Js = Int64[]
+    for E in keys(mesh)
+        el_list = elt2dof(mesh, E)
+        for el in eachcol(el_list)
+            for qnode_i in el
+                for qnode_j in el
+                    _add_qnode_entries!(Is, Js, qnode_i, qnode_j, dof_per_qnode)
+                end
+            end
+        end
+    end
+    @assert length(Is) == length(Js)
+    Vs = ones(Bool, length(Is))
+    Pb = sparse(Is, Js, Vs, n_dof, n_dof)
+    # Block diagonal
+    Pl = spzeros(ComplexF64, n_dof, n_dof)
+    Pl[Pb] = L[Pb]
+    return lu(Pl)
+end
+function _add_qnode_entries!(Is, Js, qnode_i, qnode_j, dof_per_qnode)
+    dof_index_i = dof_per_qnode * (qnode_i - 1)
+    dof_index_j = dof_per_qnode * (qnode_j - 1)
+    for i in 1:dof_per_qnode
+        for j in 1:dof_per_qnode
+            push!(Is, dof_index_i+i)
+            push!(Js, dof_index_j+j)
+        end
+    end
+end

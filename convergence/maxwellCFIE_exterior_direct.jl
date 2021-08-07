@@ -42,7 +42,7 @@ errs = Float64[]
 iterative = true;
 ##
 # Load a mesh with quadratic elements
-for n in [4]
+for n in [4,8,12]
     M     = meshgen(Γ,(n,n))
     mesh  = NystromMesh(view(M,Γ);order=qorder)
     γ₀E   = ncross(γ₀(E,mesh))    # n × E
@@ -55,7 +55,8 @@ for n in [4]
     L = Nystrom.assemble_direct_nystrom(pde, mesh, η, D, S)
     @info "Solving..."
     if iterative
-        ϕ_coeff = Density(Nystrom.solve_GMRES(L,rhs;verbose=true,maxiter=600,restart=600,abstol=1e-6), mesh)
+        Pl = Nystrom.blockdiag_preconditioner(mesh, L)  # left preconditioner
+        ϕ_coeff = Density(Nystrom.solve_GMRES(L,rhs;Pl,verbose=true,maxiter=600,restart=600,abstol=1e-6), mesh)
     else
         ϕ_coeff = Density(Nystrom.solve_LU(L,rhs), mesh)
     end
