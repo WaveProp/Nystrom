@@ -116,8 +116,9 @@ function assemble_dim_nystrom_matrix(mesh, α, β, D::T, S::T) where T<:PseudoBl
     Sm = to_matrix(S)
     Dm = to_matrix(D)
     n_qnodes = length(dofs(mesh))
-    M = Matrix{ComplexF64}(undef, 2*n_qnodes, 2*n_qnodes)
-    M .= dualJm*(0.5*α*I + α*Dm + β*Sm*Nm)*Jm
+    #M = Matrix{ComplexF64}(undef, 2*n_qnodes, 2*n_qnodes)
+    #M .= dualJm*(0.5*α*I + α*Dm + β*Sm*Nm)*Jm
+    M = dualJm*(0.5*α*I + α*Dm + β*Sm*Nm)*Jm
     return M
 end
 
@@ -129,8 +130,9 @@ function assemble_dim_nystrom_matrix_Luiz(mesh, α, β, D::T, S::T) where T<:Pse
     Sm = to_matrix(S)
     Dm = to_matrix(D)
     n_qnodes = length(dofs(mesh))
-    M = Matrix{ComplexF64}(undef, 2*n_qnodes, 2*n_qnodes)
-    M .= dualJm*(0.5*α*I + Nm*(-α*Dm + β*Sm)*Nm)*Jm
+    #M = Matrix{ComplexF64}(undef, 2*n_qnodes, 2*n_qnodes)
+    #M .= dualJm*(0.5*α*I + Nm*(-α*Dm + β*Sm)*Nm)*Jm
+    M = dualJm*(0.5*α*I + Nm*(-α*Dm + β*Sm)*Nm)*Jm
     return M
 end
 
@@ -148,4 +150,44 @@ function solve_GMRES(A::Matrix{ComplexF64}, σ::AbstractVector{V}, args...; kwar
     gmres!(vals_vec, A, σ_vec, args...; kwargs...)
     vals = reinterpret(V,vals_vec) |> collect
     return vals
+end
+
+function helmholtz_regularizer(pde::MaxwellCFIE, mesh)
+    k = parameters(pde)
+    k_helmholtz = im*k/2
+    pdeHelmholtz = Helmholtz(;dim=3,k=k_helmholtz)
+    T = default_kernel_eltype(pde)
+    n_qnodes = length(Nystrom.dofs(mesh))
+    S,_ = Nystrom.single_doublelayer_dim(pdeHelmholtz,mesh)
+    R = Nystrom.pseudoblockmatrix(T, n_qnodes, n_qnodes)
+    for j in 1:n_qnodes
+        for i in 1:n_qnodes
+            R[Nystrom.Block(i,j)] = S[i,j]*one(T)
+        end
+    end
+    return to_matrix(R)
+end
+
+function assemble_indirect_nystrom_regularized(pde, mesh, α, β, D::T, S::T) where T<:PseudoBlockMatrix
+    N, J, dualJ = ncross_and_jacobian_matrices(mesh)
+    Jm = diagonalblockmatrix_to_matrix(J.diag)
+    dualJm = diagonalblockmatrix_to_matrix(dualJ.diag)
+    Nm = diagonalblockmatrix_to_matrix(N.diag)
+    Sm = to_matrix(S)
+    Dm = to_matrix(D)
+    Rm = helmholtz_regularizer(pde, mesh)
+    M = dualJm*(0.5*α*I + α*Dm + β*Sm*Nm*Rm)*Jm
+    return M
+end
+
+function assemble_direct_nystrom(pde, mesh, η, D::PseudoBlockMatrix, S::PseudoBlockMatrix)
+    k = parameters(pde)
+    N, J, dualJ = ncross_and_jacobian_matrices(mesh)
+    Jm = diagonalblockmatrix_to_matrix(J.diag)
+    dualJm = diagonalblockmatrix_to_matrix(dualJ.diag)
+    Nm = diagonalblockmatrix_to_matrix(N.diag)
+    Sm = to_matrix(S)
+    Dm = to_matrix(D)
+    M = dualJm*(η*im*k*Nm*Sm + (1-η)*(0.5I + Dm))*Jm
+    return M
 end
