@@ -165,19 +165,34 @@ function helmholtz_regularizer(pde::MaxwellCFIE, mesh)
             R[Nystrom.Block(i,j)] = S[i,j]*one(T)
         end
     end
-    return to_matrix(R)
+    return R
 end
 
-function assemble_indirect_nystrom_regularized(pde, mesh, α, β, D::T, S::T) where T<:PseudoBlockMatrix
+function reduce_nystrom(pde, mesh, Lm, J, dualJ)
+    n_qnodes = length(dofs(mesh))
+    @assert size(Lm) == (3n_qnodes, 3n_qnodes)
+    T1 = default_kernel_eltype(pde)
+    T2 = SMatrix{2,2,ComplexF64,4}
+    L = pseudoblockmatrix(Lm, T1)
+    M = pseudoblockmatrix(T2, n_qnodes, n_qnodes)
+    Threads.@threads for j in 1:n_qnodes
+        for i in 1:n_qnodes
+            M[Block(i,j)] = dualJ.diag[i] * L[Block(i,j)] * J.diag[j]
+        end
+    end
+    return to_matrix(M)
+end
+
+function assemble_direct_nystrom_regularized(pde, mesh, η, D::PseudoBlockMatrix, S::PseudoBlockMatrix, R)
+    k = parameters(pde)
     N, J, dualJ = ncross_and_jacobian_matrices(mesh)
-    Jm = diagonalblockmatrix_to_matrix(J.diag)
-    dualJm = diagonalblockmatrix_to_matrix(dualJ.diag)
     Nm = diagonalblockmatrix_to_matrix(N.diag)
     Sm = to_matrix(S)
     Dm = to_matrix(D)
-    Rm = helmholtz_regularizer(pde, mesh)
-    M = dualJm*(0.5*α*I + α*Dm + β*Sm*Nm*Rm)*Jm
-    return M
+    Rm = to_matrix(R)
+    M1 = η*im*k*Nm*Rm*Sm + (0.5I + Dm)
+    M2 = reduce_nystrom(pde, mesh, M1, J, dualJ)
+    return M2
 end
 
 function assemble_direct_nystrom(pde, mesh, η, D::PseudoBlockMatrix, S::PseudoBlockMatrix)

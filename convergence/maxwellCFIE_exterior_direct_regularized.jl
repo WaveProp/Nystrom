@@ -7,7 +7,7 @@ BLAS.set_num_threads(Threads.nthreads())
 @info "Threads: $(Threads.nthreads())"
 
 ##
-k = 3.3
+k = 1.3
 pde = Nystrom.MaxwellCFIE(;k)
 
 # geometry and parameters
@@ -35,36 +35,37 @@ exa  = E.(eval_mesh);
 
 ## Indirect formulation
 n_src = 50         # number of interpolant sources
-η = 0.5
+η = k              # EFIE constant
 qorder = 5         # quadrature order 
 ndofs = Float64[]
 errs = Float64[]
 iterative = true;
 ##
 # Load a mesh with quadratic elements
-for n in [4]
+for n in [20]
     M     = meshgen(Γ,(n,n))
-    mesh  = NystromMesh(view(M,Γ);order=qorder)
-    γ₀E   = ncross(γ₀(E,mesh))    # n × E
-    γ₀H   = ncross(γ₀(H,mesh))    # n × H
-    S,D   = Nystrom.single_doublelayer_dim(pde,mesh;n_src)
-    N,J,dualJ = Nystrom.ncross_and_jacobian_matrices(mesh)
-    rhs = dualJ*((1-η)*γ₀H + η*N*γ₀E)
+    nmesh  = NystromMesh(view(M,Γ);order=qorder)
+    γ₀E   = ncross(γ₀(E,nmesh))    # n × E
+    γ₀H   = ncross(γ₀(H,nmesh))    # n × H
+    S,D   = Nystrom.single_doublelayer_dim(pde,nmesh;n_src)
+    N,J,dualJ = Nystrom.ncross_and_jacobian_matrices(nmesh)
+    R = Nystrom.helmholtz_regularizer(pde, nmesh)
+    rhs = dualJ*(γ₀H + η*N*(R*γ₀E))
 
     @info "Assembling matrix..."
-    L = Nystrom.assemble_direct_nystrom(pde, mesh, η, D, S)
+    L = Nystrom.assemble_direct_nystrom_regularized(pde, nmesh, η, D, S, R)
     @info "Solving..."
     if iterative
-        Pl = Nystrom.blockdiag_preconditioner(mesh, L)  # left preconditioner
-        ϕ_coeff = Density(Nystrom.solve_GMRES(L,rhs;Pl,verbose=true,maxiter=600,restart=600,abstol=1e-6), mesh)
+        Pl = Nystrom.blockdiag_preconditioner(nmesh, L)  # left preconditioner
+        ϕ_coeff = Density(Nystrom.solve_GMRES(L,rhs;Pl,verbose=true,maxiter=600,restart=600,abstol=1e-6), nmesh)
     else
-        ϕ_coeff = Density(Nystrom.solve_LU(L,rhs), mesh)
+        ϕ_coeff = Density(Nystrom.solve_LU(L,rhs), nmesh)
     end
     ϕ     = J*ϕ_coeff
-    Spot  = Nystrom.maxwellCFIE_SingleLayerPotencial(pde, mesh)
+    Spot  = Nystrom.maxwellCFIE_SingleLayerPotencial(pde, nmesh)
     Eₐ    = (x) -> im*k*Spot(ϕ,x)
     er    = (Eₐ.(eval_mesh) - exa)/norm(exa,Inf)
-    ndof = length(Nystrom.dofs(mesh))
+    ndof = length(Nystrom.dofs(nmesh))
     err = norm(er,Inf)
 
     push!(ndofs, ndof)   
