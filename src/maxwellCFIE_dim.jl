@@ -195,6 +195,18 @@ function assemble_direct_nystrom_regularized(pde, mesh, η, D::PseudoBlockMatrix
     return M2
 end
 
+function assemble_indirect_nystrom_regularized(pde, mesh, η, D::PseudoBlockMatrix, S::PseudoBlockMatrix, R)
+    k = parameters(pde)
+    N, J, dualJ = ncross_and_jacobian_matrices(mesh)
+    Nm = diagonalblockmatrix_to_matrix(N.diag)
+    Sm = to_matrix(S)
+    Dm = to_matrix(D)
+    Rm = to_matrix(R)
+    M1 = (0.5I + Dm) + η*im*k*Sm*Nm*Rm
+    M2 = reduce_nystrom(pde, mesh, M1, J, dualJ)
+    return M2
+end
+
 function assemble_direct_nystrom(pde, mesh, η, D::PseudoBlockMatrix, S::PseudoBlockMatrix)
     k = parameters(pde)
     N, J, dualJ = ncross_and_jacobian_matrices(mesh)
