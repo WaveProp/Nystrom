@@ -28,9 +28,9 @@ geo = ParametricSurfaces.Sphere(;radius=sph_radius)
 order = 5         # quadrature order 1D
 ndofs = Float64[]
 errs = Float64[]
-iterative = true;
+iterative = false;
 ##
-for n in [4,8,12]
+for n in [4]
     M     = meshgen(Γ,(n,n))
     mesh  = NystromMesh(view(M,Γ);order)
     N,J,dualJ = Nystrom.ncross_and_jacobian_matrices(mesh)
@@ -47,9 +47,9 @@ for n in [4,8,12]
         ϕ_coeff = Density(Nystrom.solve_LU(L, rhs), mesh)
     end
     ϕ     = J*ϕ_coeff
-    Spot  = SingleLayerPotential(pde,mesh)
-    Dpot  = DoubleLayerPotential(pde,mesh)
-    Eₐ    = (x) -> -α*Dpot[ncross(ϕ)](x) + β*Spot[ncross(ϕ)](x)
+    Spot  = MaxwellEFIEPotential(pde,mesh)
+    Dpot  = MaxwellMFIEPotential(pde,mesh)
+    Eₐ    = (x) -> α*Dpot[ϕ](x) + β*Spot[ncross(ϕ)](x)
     er    = (Eₐ(x0) - exa)/norm(exa)
 
     ndof = length(Nystrom.dofs(mesh))

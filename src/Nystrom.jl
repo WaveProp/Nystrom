@@ -44,6 +44,8 @@ export
     HyperSingularKernel,
     SingleLayerPotential,
     DoubleLayerPotential,
+    MaxwellEFIEPotential,
+    MaxwellMFIEPotential,
     SingleLayerOperator,
     DoubleLayerOperator,
     AdjointDoubleLayerOperator,
@@ -71,6 +73,7 @@ include("blockmatrices.jl")
 include("dim.jl")
 include("gausskronrod.jl")
 include("density.jl")
+include("maxwellwrappers.jl")
 include("maxwellCFIE.jl")
 include("maxwellCFIE_dim.jl")
 
