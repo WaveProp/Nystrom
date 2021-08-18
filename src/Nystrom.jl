@@ -9,6 +9,7 @@ using SpecialFunctions
 using QuadGK
 using RecipesBase
 using BlockArrays
+using MieSeries
 
 # packages to generate the geometry
 using GmshSDK

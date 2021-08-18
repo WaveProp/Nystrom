@@ -28,11 +28,16 @@ eval_nystrom_mesh = NystromMesh(view(eval_M,eval_Γ);order=4)
 eval_mesh = qcoords(eval_nystrom_mesh) |> collect
 
 # exact solution
+#= electric dipole
 G    = (x,y) -> Nystrom.maxwell_green_tensor(x, y, k)
 xs   = SVector(0.1,0.2,0.3) 
 c    = SVector(1+im,-2.,3.)
 E    = (dof) -> G(dof,xs)*c
 exa  = E.(eval_mesh);
+=#
+# plane wave
+E = (dof) -> -Nystrom.incident_planewave(dof; k)  
+exa = Nystrom.mieseries(eval_mesh; k, a=sph_radius, n_terms=80)
 
 ## Indirect formulation
 n_src = 50         # number of interpolant sources
@@ -41,30 +46,31 @@ n_src = 50         # number of interpolant sources
 qorder = 5         # quadrature order 1D
 ndofs = Float64[]
 errs = Float64[]
-iterative = true;
+iterative = false;
 ##
-for n in [4,8,12]
+for n in [20]
     M     = meshgen(Γ,(n,n))
-    mesh  = NystromMesh(view(M,Γ);order=qorder)
-    γ₀E   = ncross(γ₀(E,mesh))
-    S,D   = Nystrom.single_doublelayer_dim(pde,mesh;n_src=n_src)
-    N,J,dualJ = Nystrom.ncross_and_jacobian_matrices(mesh)
+    nmesh  = NystromMesh(view(M,Γ);order=qorder)
+    γ₀E   = ncross(γ₀(E,nmesh))
+    S,D   = Nystrom.single_doublelayer_dim(pde,nmesh;n_src=n_src)
+    N,J,dualJ = Nystrom.ncross_and_jacobian_matrices(nmesh)
 
     @info "Assembling matrix..."
-    L     = Nystrom.assemble_dim_nystrom_matrix(mesh, α, β, D, S)
+    L     = Nystrom.assemble_dim_nystrom_matrix(nmesh, α, β, D, S)
     @info "Solving..."
     rhs   = dualJ*γ₀E
     if iterative
-        ϕ_coeff = Density(Nystrom.solve_GMRES(L, rhs;verbose=true,maxiter=600,restart=600,abstol=1e-6), mesh)
+        Pl = Nystrom.blockdiag_preconditioner(nmesh, L)  # left preconditioner
+        ϕ_coeff = Density(Nystrom.solve_GMRES(L, rhs;Pl,verbose=true,maxiter=600,restart=600,abstol=1e-6), nmesh)
     else
-        ϕ_coeff = Density(Nystrom.solve_LU(L, rhs), mesh)
+        ϕ_coeff = Density(Nystrom.solve_LU(L, rhs), nmesh)
     end
     ϕ     = J*ϕ_coeff
-    Spot  = Nystrom.maxwellCFIE_SingleLayerPotencial(pde, mesh)
-    Dpot  = Nystrom.maxwellCFIE_DoubleLayerPotencial(pde, mesh)
+    Spot  = Nystrom.maxwellCFIE_SingleLayerPotencial(pde, nmesh)
+    Dpot  = Nystrom.maxwellCFIE_DoubleLayerPotencial(pde, nmesh)
     Eₐ    = (x) -> α*Dpot(ϕ,x) + β*Spot(ncross(ϕ),x)
     er    = (Eₐ.(eval_mesh) - exa)/norm(exa,Inf)
-    ndof = length(Nystrom.dofs(mesh))
+    ndof = length(Nystrom.dofs(nmesh))
     err = norm(er,Inf)
 
     push!(ndofs, ndof)
