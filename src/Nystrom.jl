@@ -76,5 +76,6 @@ include("density.jl")
 include("maxwellwrappers.jl")
 include("maxwellCFIE.jl")
 include("maxwellCFIE_dim.jl")
+include("discreteoperator.jl")
 
 end # module

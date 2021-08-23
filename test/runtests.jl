@@ -13,3 +13,5 @@ using SafeTestsets
 @safetestset "Density interpolation method" begin include("dim_test.jl") end
 
 @safetestset "Block matrices" begin include("blockmatrices_test.jl") end
+
+@safetestset "Discrete operators" begin include("discreteoperator_test.jl") end
