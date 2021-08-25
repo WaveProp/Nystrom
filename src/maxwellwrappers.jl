@@ -2,9 +2,15 @@
 ################################# Potentials ###################################
 ################################################################################
 
+"""
+    abstract type AbstractMaxwellPotential{T<:AbstractKernel,S}
+
+Type that wraps around `IntegralOperator`. It is used to define
+the Maxwell potentials `MaxwellEFIEPotential` and `MaxwellMFIEPotential`.
+"""
 abstract type AbstractMaxwellPotential{T<:AbstractKernel,S} end
 
-# Same interface as IntegralOperator
+# same interface as IntegralOperator
 kernel(p::AbstractMaxwellPotential) = kernel(p.ip)
 surface(p::AbstractMaxwellPotential) = surface(p.ip)
 kernel_type(p::AbstractMaxwellPotential) = kernel_type(p.ip)
@@ -23,3 +29,10 @@ end
 MaxwellMFIEPotential(op::Maxwell,surf) = MaxwellMFIEPotential(DoubleLayerPotential(op,surf))
 # overload MFIE potential evaluation
 Base.getindex(p::MaxwellMFIEPotential,σ::AbstractVector) = Base.getindex(p.ip,-ncross(σ))
+
+
+################################################################################
+################################# Operators ####################################
+################################################################################
+
+

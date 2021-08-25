@@ -148,6 +148,87 @@ function materialize(d::LinearCombinationDiscreteOp)
 end
 
 ############
+# GMRES and solvers
+############
+
+struct DiscreteOpGMRES{D<:AbstractDiscreteOp,T<:Number,V}
+    op::D
+    s::Int64  # size
+end
+function DiscreteOpGMRES(op::AbstractDiscreteOp, σ::AbstractVector{V}) where V
+    @assert size(op,1) == size(op,2)
+    @assert size(op,2) == length(σ)
+    if V <: Number
+        s = length(σ)  # size
+        return DiscreteOpGMRES{typeof(op),V,V}(op, s)
+    elseif V <: SVector
+        T = eltype(V)
+        s = length(σ) * length(V)  # size
+        return DiscreteOpGMRES{typeof(op),T,V}(op, s)
+    else
+        notimplemented()
+    end
+end
+Base.size(g::DiscreteOpGMRES) = (g.s, g.s)
+Base.size(g::DiscreteOpGMRES, i) = size(g)[i]
+Base.eltype(::DiscreteOpGMRES{D,T}) where {D,T} = T
+function LinearAlgebra.mul!(yvec::AbstractVector{T}, g::DiscreteOpGMRES{D,T,V}, xvec::AbstractVector{T}) where {D,T,V}
+    if T === V
+        yvec .= g.op*xvec
+    else
+        x = reinterpret(V, xvec)
+        yvec .= reinterpret(T, g.op*x)
+    end
+    return yvec
+end
+
+function IterativeSolvers.gmres!(σ::Density{V},A::AbstractDiscreteOp,μ::Density{V},args...;kwargs...) where V
+    log = haskey(kwargs,:log) ? kwargs[:log] : false
+    Aop = DiscreteOpGMRES(A, μ)
+    if V <: Number
+        if log
+            vals,hist = gmres!(σ.vals,Aop,μ.vals,args...;kwargs...)
+            return σ,hist
+        else
+            vals = gmres!(σ.vals,Aop,μ.vals,args...;kwargs...)
+            return σ
+        end
+    elseif V <: SVector
+        σ_vec = reinterpret(eltype(V),σ.vals)
+        μ_vec = reinterpret(eltype(V),μ.vals)
+        if log
+            vals,hist = gmres!(σ_vec,Aop,μ_vec,args...;kwargs...)
+            return σ,hist
+        else
+            vals = gmres!(σ_vec,Aop,μ_vec,args...;kwargs...)
+            return σ
+        end
+    else
+        notimplemented()
+    end
+end
+
+function Base.:\(A::AbstractDiscreteOp,σ::Density{V}) where V
+    Amat = materialize(A)  # assemble the full matrix
+    if V <: Number
+        @assert eltype(Amat) === V
+        vals = Amat \ σ.vals
+        return Density(vals, σ.mesh)
+    elseif V <: SVector
+        T = eltype(V)
+        N = length(V)
+        @assert eltype(Amat) <: SMatrix{N,N,T}
+        Ascalar = blockmatrix_to_matrix(Amat)
+        σ_vec = reinterpret(T, σ.vals)
+        vals_vec = Ascalar \ σ_vec
+        vals = reinterpret(V, vals_vec) |> collect
+        return Density(vals, σ.mesh)
+    else
+        notimplemented()
+    end
+end
+
+############
 # show
 ############
 function _show_size(D)

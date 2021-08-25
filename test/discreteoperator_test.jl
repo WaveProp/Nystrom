@@ -51,4 +51,38 @@ Random.seed!(1)
         @test C*(α*(B*x-α*(A*x)))+(1-α)*(C*x) == (Cop*α*(Bop-α*Aop)+(1-α)*Cop)*x
         @test C*(α*(B-α*A))+(1-α)*C == Nystrom.materialize(Cop*α*(Bop-α*Aop)+(1-α)*Cop)
     end
+
+    @testset "GMRES and LU tests" begin
+        # mesh
+        Geometry.clear_entities!()
+        Ω = ParametricSurfaces.Sphere(;radius=1) |> Geometry.Domain
+        Γ = boundary(Ω)
+        M = ParametricSurfaces.meshgen(Γ,(2,2))
+        mesh = NystromMesh(view(M,Γ),order=1)
+
+        mat = α*A-B+α*B
+        op = α*Aop-Bop+α*Bop
+        Amat = Nystrom.blockmatrix_to_matrix(mat)
+        xvec = reinterpret(eltype(eltype(x)), x)
+        b = reinterpret(eltype(x), Amat\xvec) |> collect
+        σx = Density(x, mesh)
+        σb = Density(b, mesh)
+
+        ll = Nystrom.DiscreteOpGMRES(op, σx)
+        yy = similar(xvec)
+        mul!(yy, ll, xvec)
+
+        @testset "Vector case" begin
+            @test σb == (op\σx)
+            @test σb ≈ Nystrom.gmres(op, σx)
+        end
+
+        op_scalar = Nystrom.DiscreteOp(Amat)
+        σx_scalar = Density(collect(xvec), mesh)
+        σb_scalar = Density(Amat\xvec, mesh)
+        @testset "Scalar case" begin
+            @test σb_scalar == (op_scalar\σx_scalar)
+            @test σb_scalar ≈ Nystrom.gmres(op_scalar, σx_scalar)
+        end
+    end
 end
