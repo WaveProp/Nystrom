@@ -1,9 +1,18 @@
+# Discrete operators types and methods.
+# Based on the LinearMaps.jl package.
 
 ############
 # AbstractDiscreteOp
 ############
 
+"""
+    abstract type AbstractDiscreteOp
+    
+A linear operator that can be evaluated using its forward map. It also 
+supports additions and compositions with others `::AbstractDiscreteOp`.
+"""
 abstract type AbstractDiscreteOp end
+
 const DiscreteOpTuple = Tuple{Vararg{AbstractDiscreteOp}}
 
 Base.:+(d::AbstractDiscreteOp) = d
@@ -15,6 +24,14 @@ Base.:*(d::AbstractDiscreteOp,_) = abstractmethod(d)
 Base.:*(_,d::AbstractDiscreteOp) = abstractmethod(d)
 Base.size(d::AbstractDiscreteOp) = abstractmethod(d)
 Base.size(d::AbstractDiscreteOp,i::Integer) = size(d)[i]
+
+"""
+    materialize(d::AbstractDiscreteOp)
+
+Returns the explicit matrix representation of the underlying operator in 
+`d::AbstractDiscreteOp`. This method can be expensive due to 
+matrix additions and multiplications.
+"""
 materialize(d::AbstractDiscreteOp) = abstractmethod(d)
 _materialize(d::AbstractDiscreteOp,x) = materialize(d)*x
 
@@ -150,10 +167,18 @@ end
 ############
 # GMRES and solvers
 ############
+"""
+    struct DiscreteOpGMRES{D<:AbstractDiscreteOp,T<:Number,V}
 
+A wrapper around 'op::AbstractDiscreteOp' to use in conjunction with
+the `IterativeSolvers.gmres!` method. 
+"""
 struct DiscreteOpGMRES{D<:AbstractDiscreteOp,T<:Number,V}
+    # T: scalar matrix element type
+    # V: element type of the vectors that `op::AbstractDiscreteOp` 
+    # receives as input (e.g. SVector{3,Float64} or ComplexF64)
     op::D
-    s::Int64  # size
+    s::Int64  # scalar matrix size
 end
 function DiscreteOpGMRES(op::AbstractDiscreteOp, σ::AbstractVector{V}) where V
     @assert size(op,1) == size(op,2)
