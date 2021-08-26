@@ -51,7 +51,7 @@ function Base.:*(d::UniformScalingDiscreteOp,x::AbstractVector)
     _check_dim_mul(d,x)
     return d.λ*x
 end
-function Base.:*(d1::U,d2::U) where {U<:UniformScalingDiscreteOp}
+function Base.:*(d1::UniformScalingDiscreteOp,d2::UniformScalingDiscreteOp) 
     _check_dim_mul(d1,d2)
     return UniformScalingDiscreteOp(d1.λ*d2.λ, size(d1,1))
 end
@@ -108,6 +108,8 @@ end
 function Base.:*(d::AbstractDiscreteOp, α::Number)
     return CompositeDiscreteOp(d, UniformScalingDiscreteOp(α,size(d,2)))
 end
+Base.:*(u::UniformScaling, d::AbstractDiscreteOp) = u.λ*d
+Base.:*(d::AbstractDiscreteOp, u::UniformScaling) = d*u.λ
 function Base.:-(d::AbstractDiscreteOp)
     return CompositeDiscreteOp(UniformScalingDiscreteOp(-1,size(d,1)), d)
 end
@@ -153,6 +155,16 @@ function Base.:+(d1::AbstractDiscreteOp, d2::AbstractDiscreteOp)
     _check_dim_sum(d1,d2)
     return LinearCombinationDiscreteOp(d1, d2)
 end
+function Base.:+(u::UniformScaling, d::AbstractDiscreteOp)
+    @assert size(d,1) == size(d,2)
+    return UniformScalingDiscreteOp(u.λ,size(d,1)) + d
+end
+function Base.:+(d::AbstractDiscreteOp, u::UniformScaling)
+    @assert size(d,1) == size(d,2)
+    return d + UniformScalingDiscreteOp(u.λ,size(d,2))
+end
+Base.:-(u::UniformScaling, d::AbstractDiscreteOp) = u+(-d)
+Base.:-(d::AbstractDiscreteOp, u::UniformScaling) = d+(-u)
 Base.:-(d1::AbstractDiscreteOp, d2::AbstractDiscreteOp) = d1+(-d2)
 
 function materialize(d::LinearCombinationDiscreteOp)
