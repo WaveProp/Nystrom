@@ -47,9 +47,9 @@ Random.seed!(1)
     end
 
     @testset "Mixed tests" begin
-        @test size(C*α*(B-α*A)+(1-α)*C) == size(Cop*α*(Bop-α*Aop)+(1-α)*Cop)
-        @test C*(α*(B*x-α*(A*x)))+(1-α)*(C*x) == (Cop*α*(Bop-α*Aop)+(1-α)*Cop)*x
-        @test C*(α*(B-α*A))+(1-α)*C == Nystrom.materialize(Cop*α*(Bop-α*Aop)+(1-α)*Cop)
+        @test size(C*α*(α*I+B-α*A)+(1-α)*C) == size(Cop*α*(α*I+Bop-α*Aop)+(1-α)*Cop)
+        @test C*(α*(α*x+B*x-α*(A*x)))+(1-α)*(C*x) == (Cop*α*(α*I+Bop-α*Aop)+(1-α)*Cop)*x
+        @test C*(α*(α*I+B-α*A))+(1-α)*C == Nystrom.materialize(Cop*α*(α*I+Bop-α*Aop)+(1-α)*Cop)
     end
 
     @testset "GMRES and LU tests" begin

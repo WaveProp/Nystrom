@@ -62,7 +62,7 @@ function Base.:*(α::Number,d::UniformScalingDiscreteOp)
     return UniformScalingDiscreteOp(α*d.λ, size(d,1))
 end
 
-materialize(d::UniformScalingDiscreteOp) = d.λ
+materialize(d::UniformScalingDiscreteOp) = UniformScaling(d.λ)
 
 ############
 # DiscreteOp
@@ -168,9 +168,20 @@ Base.:-(d::AbstractDiscreteOp, u::UniformScaling) = d+(-u)
 Base.:-(d1::AbstractDiscreteOp, d2::AbstractDiscreteOp) = d1+(-d2)
 
 function materialize(d::LinearCombinationDiscreteOp)
-    # evaluate sum from left to right
-    y = materialize(first(d.maps))
-    for n in 2:length(d.maps)
+    # find a map that is not an UniformScalingDiscreteOp
+    map_index = 1
+    for _ in eachindex(d.maps)
+        !isa(d.maps[map_index], UniformScalingDiscreteOp) && break
+        map_index += 1
+    end
+    msg = """Cannot materialize a LinearCombinationDiscreteOp
+    whose maps are all UniformScalingDiscreteOp. Not implemented."""
+    @assert (map_index ≤ length(d.maps)) msg
+    # materialize map and
+    # evaluate the sum from left to right
+    y = materialize(d.maps[map_index])
+    for n in eachindex(d.maps)
+        n == map_index && continue
         y += materialize(d.maps[n])
     end
     return y
