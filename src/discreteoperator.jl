@@ -119,9 +119,26 @@ function materialize(d::CompositeDiscreteOp)
 end
 function _materialize(d::CompositeDiscreteOp, x)
     # evaluate operators from right to left
-    y = materialize(d.maps[end])*x
-    length(d.maps) == 2 && return materialize(d.maps[1])*y
+    m1 = materialize(d.maps[end])
+    y = _mymul(m1,x)   # m1*x
+    if length(d.maps) == 2
+        m2 = materialize(d.maps[1])
+        return _mymul(m2,y)  # m2*y
+    end
     return _materialize(CompositeDiscreteOp(d.maps[1:end-1]), y)
+end
+function _mymul(A, B)
+    # this function patches a bug that
+    # occurs when a Diagonal{<:SMatrix}
+    # is multiplied by a Matrix{<:SMatrix}
+    # with SMatrices of different sizes
+    if A isa Diagonal{<:SMatrix} && B isa Matrix{<:SMatrix}
+        return A.diag.*B
+    elseif A isa Matrix{<:SMatrix} && B isa Diagonal{<:SMatrix}
+        return A.*permutedims(B.diag)
+    else
+        return A*B
+    end
 end
 
 ############
