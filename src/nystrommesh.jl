@@ -281,18 +281,16 @@ end
 #     return msh1
 # end
 
-function diagonal_ncross_jac_matrix(mesh)
-    qnodes = dofs(mesh)
+function diagonal_ncross_and_jacobian_matrices(nmesh)
+    qnodes = dofs(nmesh)
     nmatrix = Diagonal([cross_product_matrix(normal(q)) for q in qnodes])
     jmatrix = Diagonal([jacobian(q) for q in qnodes])
-    return nmatrix, jmatrix
+    dual_jmatrix = Diagonal([SMatrix{2,3,Float64,6}(pinv(jacobian(q))) for q in qnodes])
+    return nmatrix, jmatrix, dual_jmatrix
 end
-
-function diagonal_ncross_matrix(mesh)
-    qnodes = dofs(mesh)
-    nmatrix = Diagonal([cross_product_matrix(normal(q)) for q in qnodes])
-    return nmatrix
-end
+diagonal_ncross_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[1]
+diagonal_jacobian_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[2]
+diagonal_dualjacobian_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[3]
 
 # Plot recipes
 

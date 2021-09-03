@@ -39,10 +39,10 @@ function single_doublelayer_dim(pde,X,Y=X;compress=Matrix,location=:onsurface)
         δS = _singular_weights_dim(Sop,γ₀B,γ₁B,R,dict_near)
         δD = _singular_weights_dim(Dop,γ₀B,γ₁B,R,dict_near)
     end
-    # add corrections to the dense part
-    axpy!(true,δS,S)
-    axpy!(true,δD,D)
-    return S,D
+    # convert to DiscreteOp
+    S_discrete = DiscreteOp(S) + DiscreteOp(δS)
+    D_discrete = DiscreteOp(D) + DiscreteOp(δD)
+    return S_discrete,D_discrete
 end
 singlelayer_dim(args...;kwargs...) = single_doublelayer_dim(args...;kwargs...)[1]
 doublelayer_dim(args...;kwargs...) = single_doublelayer_dim(args...;kwargs...)[2]
@@ -63,10 +63,10 @@ function adjointdoublelayer_hypersingular_dim(pde,X,Y=X;compress=Matrix,location
     # compute corrections
     δK        = _singular_weights_dim(Kop,γ₀B,γ₁B,R,dict_near)
     δH        = _singular_weights_dim(Hop,γ₀B,γ₁B,R,dict_near)
-    # add corrections to the dense part
-    axpy!(true,δK,K)
-    axpy!(true,δH,H)
-    return K,H
+    # convert to DiscreteOp
+    K_discrete = DiscreteOp(K) + DiscreteOp(δK)
+    H_discrete = DiscreteOp(H) + DiscreteOp(δH)
+    return K_discrete,H_discrete
 end
 adjointdoublelayer_dim(args...;kwargs...)  = adjointdoublelayer_hypersingular_dim(args...;kwargs...)[1]
 hypersingular_dim(args...;kwargs...)       = adjointdoublelayer_hypersingular_dim(args...;kwargs...)[2]
