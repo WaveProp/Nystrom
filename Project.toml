@@ -17,4 +17,5 @@ WavePropBase = "91c5bd54-65f5-4719-ae3b-9579edfc4a0b"
 
 [compat]
 SpecialFunctions = "1"
+QuadGK = "2"
 StaticArrays = "1"
