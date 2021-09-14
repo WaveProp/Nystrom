@@ -1,6 +1,5 @@
 module Nystrom
 
-using StaticArrays: minimum
 using StaticArrays
 using LinearAlgebra
 using SparseArrays
@@ -21,8 +20,10 @@ using WavePropBase.Interpolation
 using WavePropBase.Integration
 using WavePropBase.Mesh
 using WavePropBase.Simulation
-
 WavePropBase.@import_interface
+
+# Interpolated Factored Green Function Method
+import IFGF
 
 export
     # re-export useful stuff

@@ -16,11 +16,7 @@ end
 coords(dof::NystromDOF)   = dof.coords
 weight(dof::NystromDOF)   = dof.weight
 jacobian(dof::NystromDOF) = dof.jacobian
-
 normal(dof::NystromDOF)   = normal(jacobian(dof))
-
-coords(x::Tuple)     = x
-coords(x::SVector)   = x
 
 function NystromDOF(q::SVector{N,T},w::T,jac::SMatrix{N,_,T}) where {N,_,T}
     NystromDOF{N,T}(q,w,jac)

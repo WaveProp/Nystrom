@@ -70,6 +70,7 @@ materialize(d::UniformScalingDiscreteOp) = UniformScaling(d.λ)
 struct DiscreteOp{D} <: AbstractDiscreteOp
     op::D
 end
+DiscreteOp(d::DiscreteOp) = d
 Base.size(d::DiscreteOp) = size(d.op)
 Base.:*(d::DiscreteOp,x::AbstractVector) = d.op*x
 materialize(d::DiscreteOp) = d.op
