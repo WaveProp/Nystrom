@@ -97,7 +97,7 @@ version = "4.7.0"
 
 [[IFGF]]
 deps = ["AbstractTrees", "LinearAlgebra", "Printf", "RecipesBase", "StaticArrays", "TimerOutputs", "WavePropBase"]
-git-tree-sha1 = "8536321de10b56ec4d3099bda58d6877406af989"
+git-tree-sha1 = "142d1f934bc6541dba81cf4aef11c9e8bfab3f47"
 repo-rev = "riarrieta/dev"
 repo-url = "https://github.com/WaveProp/IFGF"
 uuid = "b05b8bba-df36-43cd-9ac7-ed4ff3985281"

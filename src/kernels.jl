@@ -7,7 +7,7 @@ A kernel functions `K` with the signature `K(target,source)::T`.
 """
 abstract type AbstractKernel{T} end
 
-return_type(K::AbstractKernel{T}) where {T} = T
+return_type(::AbstractKernel{T}) where {T} = T
 
 ambient_dimension(K::AbstractKernel) = ambient_dimension(pde(K))
 
