@@ -57,7 +57,8 @@ export
     coords,
     qcoords,
     γ₀,
-    γ₁
+    γ₁,
+    IFGFCompressor
 
 WavePropBase.@export_interface
 
