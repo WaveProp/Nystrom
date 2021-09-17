@@ -16,7 +16,7 @@ pdes = [Laplace(dim=3),
         Helmholtz(dim=3,k=k),
         Elastostatic(dim=3,μ=1,λ=2),
         Maxwell(dim=3,k=k)]
-pde = pdes[4]
+pde = pdes[3]
 
 # select operator
 ops = [SingleLayerOperator,
@@ -40,7 +40,7 @@ I = rand(1:nx,1000)
 B = rand(T,nx) # CHECK: randn or rand?
 Xpts = msh.dofs
 Ypts = msh.dofs
-K = Nystrom.kernel(iop)
+K = (x,y) -> iop.kernel(x,y)*Nystrom.weight(y)
 tfull = @elapsed exa = [sum(K(Xpts[i],Ypts[j])*B[j] for j in 1:nx) for i in I]
 @info "Estimated time for full product: $(tfull*nx/1000)"
 
@@ -50,6 +50,6 @@ p = (3,5,5)  # interpolation points per dimension
 compress = Nystrom.IFGFCompressor(;p,nmax,_profile=true);
 A = compress(iop);
 C = zeros(T,nx)
-Nystrom.IFGF.@hprofile mul!(C,A,B)
+Nystrom.IFGF.@hprofile C = A*B
 er = norm(C[I]-exa,2) / norm(exa,2)
 @info "" typeof(pde) op (er,nx)

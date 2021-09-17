@@ -2,7 +2,6 @@ using Test
 using StaticArrays
 using Random
 using Nystrom
-using ParametricSurfaces
 using LinearAlgebra
 Random.seed!(1)
 
@@ -11,14 +10,14 @@ Random.seed!(1)
     λ    = 2π/k     # wavelength
     ppw  = 4        # points per wavelength
     dx   = λ/ppw    # distance between points
-    nmax = 100      # max points per leaf box
+    nmax = 20       # max points per leaf box
     p    = (3,5,5)  # interpolation points per dimension
     pde  = Helmholtz(dim=3,k=k)
 
     # geometry
-    clear_entities!()
+    Geometry.clear_entities!()
     geo = ParametricSurfaces.Sphere(;radius=1)
-    Ω   = Domain(geo)
+    Ω   = ParametricSurfaces.Domain(geo)
     Γ   = boundary(Ω)
     np  = ceil(2/dx)
     M   = meshgen(Γ,(np,np))
@@ -32,6 +31,7 @@ Random.seed!(1)
         compress = IFGFCompressor(;p,nmax)
         A = compress(iop)
         exa = iop*B
-        @test A*B ≈ iop*B
+        @test norm(A*B-exa)/norm(exa) < 1e-2
+        # @info "" norm(A*B-exa)/norm(exa)
     end
 end
