@@ -1,6 +1,5 @@
 module Nystrom
 
-using StaticArrays: minimum
 using StaticArrays
 using LinearAlgebra
 using SparseArrays
@@ -21,8 +20,11 @@ using WavePropBase.Interpolation
 using WavePropBase.Integration
 using WavePropBase.Mesh
 using WavePropBase.Simulation
-
 WavePropBase.@import_interface
+
+# Interpolated Factored Green Function Method
+import IFGF
+import IFGF: IFGFOperator, centered_factor
 
 export
     # re-export useful stuff
@@ -55,7 +57,8 @@ export
     coords,
     qcoords,
     γ₀,
-    γ₁
+    γ₁,
+    IFGFCompressor
 
 WavePropBase.@export_interface
 
@@ -70,5 +73,6 @@ include("dim.jl")
 include("gausskronrod.jl")
 include("maxwellwrappers.jl")
 include("discreteoperator.jl")
+include("ifgf.jl")
 
 end # module
