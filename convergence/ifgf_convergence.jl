@@ -16,7 +16,7 @@ pdes = [Laplace(dim=3),
         Helmholtz(dim=3,k=k),
         Elastostatic(dim=3,μ=1,λ=2),
         Maxwell(dim=3,k=k)]
-pde = pdes[3]
+pde = pdes[2]
 
 # select operator
 ops = [SingleLayerOperator,

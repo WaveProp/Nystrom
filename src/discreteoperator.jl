@@ -47,7 +47,7 @@ struct UniformScalingDiscreteOp{T<:Number} <: AbstractDiscreteOp
 end
 Base.size(d::UniformScalingDiscreteOp) = (d.s,d.s)
 
-function Base.:*(d::UniformScalingDiscreteOp,x::AbstractVector) 
+function Base.:*(d::UniformScalingDiscreteOp,x::AbstractVecOrMat) 
     _check_dim_mul(d,x)
     return d.λ*x
 end
@@ -70,9 +70,9 @@ materialize(d::UniformScalingDiscreteOp) = UniformScaling(d.λ)
 struct DiscreteOp{D} <: AbstractDiscreteOp
     op::D
 end
-DiscreteOp(d::DiscreteOp) = d
+DiscreteOp(d::AbstractDiscreteOp) = d
 Base.size(d::DiscreteOp) = size(d.op)
-Base.:*(d::DiscreteOp,x::AbstractVector) = d.op*x
+Base.:*(d::DiscreteOp,x::AbstractVecOrMat) = d.op*x
 materialize(d::DiscreteOp) = d.op
 
 ############
@@ -92,7 +92,7 @@ CompositeDiscreteOp(d1::CompositeDiscreteOp, d2::CompositeDiscreteOp) = Composit
 
 Base.size(d::CompositeDiscreteOp) = (size(first(d.maps),1), size(last(d.maps),2))
 
-function Base.:*(d::CompositeDiscreteOp,x::AbstractVector) 
+function Base.:*(d::CompositeDiscreteOp,x::AbstractVecOrMat) 
     _check_dim_mul(d,x)
     # evaluate product from right to left
     y = last(d.maps)*x
@@ -159,7 +159,7 @@ LinearCombinationDiscreteOp(d1::LinearCombinationDiscreteOp, d2::LinearCombinati
 
 Base.size(d::LinearCombinationDiscreteOp) = size(first(d.maps))
 
-function Base.:*(d::LinearCombinationDiscreteOp,x::AbstractVector) 
+function Base.:*(d::LinearCombinationDiscreteOp,x::AbstractVecOrMat) 
     _check_dim_mul(d,x)
     # evaluate product from left to right
     y = first(d.maps)*x

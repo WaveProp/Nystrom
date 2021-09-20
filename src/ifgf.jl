@@ -13,16 +13,13 @@ function IFGF.IFGFOperator(iop::IntegralOperator;
                            _splitter=IFGF.DyadicSplitter,
                            _profile=false)
     K = kernel(iop)
-    PDE = pde(K)
     Ypts = iop |> source_surface |> dofs
     Xpts = iop |> target_surface |> dofs
     splitter = _splitter(;nmax)
-    # TODO: better way of doing this?
-    datatype = Base.promote_op(*, default_kernel_eltype(PDE), default_density_eltype(PDE))
     p_func = (node) -> p 
     k = wavenumber(K)
     ds_func = IFGF.cone_domain_size_func(k)
-    ifgf = IFGF.IFGFOperator(K,Ypts,Xpts;datatype,splitter,p_func,ds_func,_profile)
+    ifgf = IFGF.IFGFOperator(K,Ypts,Xpts;splitter,p_func,ds_func,_profile)
     # wrap ifgf and qweights together as a DiscreteOp
     # (kernels do not include qweights)
     w = iop |> source_surface |> qweights |> collect |> Diagonal

@@ -24,13 +24,15 @@ geo = ParametricSurfaces.Sphere(;radius=sph_radius)
 
 ## CFIE
 α = 1
-β = im*k
+β = im*k/sph_radius
 order = 5         # quadrature order 1D
 ndofs = Float64[]
 errs = Float64[]
 iterative = true;
+#compress = Matrix
+compress = Nystrom.IFGFCompressor(;p=(3,5,5),nmax=100);
 ##
-for n in [2,4,8]
+for n in [4]
     M     = meshgen(Γ,(n,n))
     nmesh = NystromMesh(view(M,Γ);order)
     J     = Nystrom.diagonal_jacobian_matrix(nmesh)
@@ -39,7 +41,7 @@ for n in [2,4,8]
     rhs   = dualJ*ncross(γ₀E)
 
     @info "Computing operators..."
-    T,K = Nystrom.maxwell_dim(pde,nmesh)   # EFIE, MFIE
+    T,K = Nystrom.maxwell_dim(pde,nmesh;compress)   # EFIE, MFIE
     @info "Assembling system matrix..."
     L   = Nystrom.assemble_maxwell_indirect_cfie(nmesh, α, β, K, T)
     @info "Solving..."
