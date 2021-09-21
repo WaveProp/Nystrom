@@ -7,6 +7,8 @@ using IterativeSolvers
 using SpecialFunctions
 using QuadGK
 using RecipesBase
+using TimerOutputs
+using Base.Threads
 
 # packages to generate the geometry
 using GmshSDK
