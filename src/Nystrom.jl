@@ -21,7 +21,7 @@ using WavePropBase.Geometry
 using WavePropBase.Interpolation
 using WavePropBase.Integration
 using WavePropBase.Mesh
-using WavePropBase.Simulation
+using WavePropBase.Trees
 WavePropBase.@import_interface
 
 # Interpolated Factored Green Function Method
@@ -29,9 +29,12 @@ import IFGF
 import IFGF: IFGFOperator, centered_factor
 
 export
+    # Gmsh related stuff
+    GmshSDK,
+    @gmsh,
+    gmsh,
     # re-export useful stuff
     Geometry,
-    GmshSDK,
     ParametricSurfaces,
     Laplace,
     Helmholtz,

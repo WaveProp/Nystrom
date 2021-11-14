@@ -14,6 +14,7 @@ struct NystromDOF{N,T,M,NM}
 end
 
 coords(dof::NystromDOF)   = dof.coords
+center(dof::NystromDOF)   = dof.coords
 weight(dof::NystromDOF)   = dof.weight
 jacobian(dof::NystromDOF) = dof.jacobian
 normal(dof::NystromDOF)   = normal(jacobian(dof))
@@ -30,7 +31,7 @@ function Base.show(io::IO,dof::NystromDOF)
         globidx = $(dof.globidx)")
 end
 
-bounding_box(qnodes::Vector{<:NystromDOF}) = bounding_box(coords(q) for q in qnodes)
+Interpolation.HyperRectangle(qnodes::Vector{<:NystromDOF}) = HyperRectangle(coords(q) for q in qnodes)
 
 """
     struct NystromMesh{N,T} <: AbstractMesh{N,T}
@@ -75,7 +76,7 @@ qjacobians(m::NystromMesh) = (jacobian(q) for q in dofs(m))
 qnormals(m::NystromMesh) = (normal(q) for q in dofs(m))
 
 # entities and domain
-entities(mesh::NystromMesh) = collect(keys(mesh.ent2elt))
+Geometry.entities(mesh::NystromMesh) = collect(keys(mesh.ent2elt))
 domain(mesh::NystromMesh)   = Domain(entities(mesh))
 
 Base.keys(m::NystromMesh) = keys(elements(m))

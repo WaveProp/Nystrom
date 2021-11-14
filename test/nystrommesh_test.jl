@@ -5,9 +5,16 @@ using Nystrom
 @testset "Area/volume" begin
     @testset "Cube" begin
         # generate a mesh
-        Geometry.clear_entities!()
         (lx,ly,lz) = widths = (1.,1.,2.)
-        Ω, M  = GmshSDK.box(;widths=widths)
+        Ω,M = @gmsh begin
+            Geometry.clear_entities!()
+            gmsh.model.occ.addBox(0,0,0,lx,ly,lz)
+            gmsh.model.occ.synchronize()
+            gmsh.model.mesh.generate(3)
+            Ω = GmshSDK.domain(dim=3)
+            M = GmshSDK.meshgen(Ω,dim=3)
+            return Ω,M
+        end
         ∂Ω = boundary(Ω)
         mesh  = NystromMesh(view(M,∂Ω),order=1)
         A     = 2*(lx*ly + lx*lz + ly*lz)
@@ -22,11 +29,20 @@ using Nystrom
         # create a mesh using GmshSDK package
         r = 0.5
         Geometry.clear_entities!()
-        Ω,M   = GmshSDK.sphere(dim=3,h=0.05,order=1,radius=r)
+        Ω,M   = @gmsh begin
+            GmshSDK.set_meshsize(0.1)
+            Geometry.clear_entities!()
+            gmsh.model.occ.addSphere(0,0,0,r)
+            gmsh.model.occ.synchronize()
+            gmsh.model.mesh.generate(3)
+            Ω = GmshSDK.domain(dim=3)
+            M = GmshSDK.meshgen(Ω,dim=3)
+            return Ω,M
+        end
         Γ     = boundary(Ω)
         nmesh = NystromMesh(M,Γ,order=4) # NystromMesh of surface Γ
         area  = sum(qweights(nmesh))
-        @test isapprox(area,4*π*r^2,atol=1e-2)
+        @test isapprox(area,4*π*r^2,atol=5e-2)
         nmesh = NystromMesh(M,Ω,order=4) # Nystrom mesh of volume Ω
         volume  = sum(qweights(nmesh))
         @test isapprox(volume,4/3*π*r^3,atol=1e-2)
@@ -43,7 +59,15 @@ using Nystrom
     @testset "Circle" begin
         r = rx = ry = 0.5
         Geometry.clear_entities!()
-        Ω, M = GmshSDK.disk(;rx,ry)
+        Ω,M = @gmsh begin
+            Geometry.clear_entities!()
+            gmsh.model.occ.addDisk(0,0,0,rx,ry)
+            gmsh.model.occ.synchronize()
+            gmsh.model.mesh.generate(2)
+            Ω = GmshSDK.domain(dim=2)
+            M = GmshSDK.meshgen(Ω,dim=2)
+            return Ω,M
+        end
         Γ    = boundary(Ω)
         mesh = NystromMesh(view(M,Ω),order=2)
         A    = π*r^2

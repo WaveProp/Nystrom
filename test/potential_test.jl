@@ -36,7 +36,7 @@ Random.seed!(1)
         Geometry.clear_entities!()
         Ω  = ParametricSurfaces.Sphere() |> Geometry.Domain
         Γ    = boundary(Ω)
-        M    = meshgen(Γ,(4,4))
+        M    = ParametricSurfaces.meshgen(Γ,(4,4))
         mesh = NystromMesh(view(M,Γ),order=5)
         x₀   = SVector(0.1,-0.2,0.1)
         xout = SVector(3,3,3)
@@ -67,7 +67,7 @@ end
         Geometry.clear_entities!()
         Ω  = ParametricSurfaces.Circle() |> Geometry.Domain
         Γ    = boundary(Ω)
-        M    = meshgen(Γ,(10,))
+        M    = ParametricSurfaces.meshgen(Γ,(10,))
         mesh = NystromMesh(view(M,Γ),order=5)
         x₀   = SVector(3,3)
         xin = SVector(0.1,0.2)
@@ -93,7 +93,7 @@ end
         Geometry.clear_entities!()
         Ω  = ParametricSurfaces.Sphere() |> Geometry.Domain
         Γ    = boundary(Ω)
-        M    = meshgen(Γ,(4,4))
+        M    = ParametricSurfaces.meshgen(Γ,(4,4))
         mesh = NystromMesh(view(M,Γ),order=5)
         x₀   = SVector(3,3,3)
         xin = SVector(0.1,-0.2,0)

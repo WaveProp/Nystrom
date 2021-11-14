@@ -13,7 +13,7 @@ Random.seed!(1)
         Ω   = ParametricSurfaces.Circle() |> Geometry.Domain
         Γ   = boundary(Ω)
         M   = ParametricSurfaces.meshgen(Γ,(5,))
-        mesh = NystromMesh(view(M,Γ),order=5)
+        mesh = NystromMesh(view(M,Γ),order=3)
         xout = SVector(3,3)
         ops = (
             Laplace(;dim=2),
@@ -39,7 +39,7 @@ Random.seed!(1)
             Ddim  = Nystrom.assemble_dim(D)
             e1    = Nystrom.error_interior_green_identity(Sdim,Ddim,γ₀u,γ₁u)/γ₀u_norm
             @testset "Single/double layer $(string(pde))" begin
-                @test norm(e0,Inf) > rtol
+                @test norm(e0,Inf) > norm(e1,Inf)
                 @test norm(e1,Inf) < rtol
             end
             # adjoint double-layer and hypersingular
@@ -63,7 +63,7 @@ Random.seed!(1)
         Ω   = ParametricSurfaces.Sphere(;radius=1) |> Geometry.Domain
         Γ   = boundary(Ω)
         M   = ParametricSurfaces.meshgen(Γ,(2,2))
-        mesh = NystromMesh(view(M,Γ),order=5)
+        mesh = NystromMesh(view(M,Γ),order=3)
         xout = SVector(3,3,3)
         ops = (
             Laplace(;dim=3),
@@ -90,7 +90,7 @@ Random.seed!(1)
             Ddim  = Nystrom.assemble_dim(D)
             e1    = Nystrom.error_interior_green_identity(Sdim,Ddim,γ₀u,γ₁u)/γ₀u_norm
             @testset "Single/double layer $(string(pde))" begin
-                @test norm(e0,Inf) > rtol
+                @test norm(e0,Inf) > norm(e1,Inf)
                 @test norm(e1,Inf) < rtol
             end
             # adjoint double-layer and hypersingular
@@ -104,7 +104,7 @@ Random.seed!(1)
             Hdim  = Nystrom.assemble_dim(H)
             e1   = Nystrom.error_interior_derivative_green_identity(Kdim,Hdim,γ₀u,γ₁u)/γ₁u_norm
             @testset "Adjoint double-layer/hypersingular $(string(pde))" begin
-                @test norm(e0,Inf) > rtol
+                @test norm(e0,Inf) > norm(e1,Inf)
                 @test norm(e1,Inf) < rtol
             end
         end
@@ -115,7 +115,7 @@ Random.seed!(1)
         Ω   = ParametricSurfaces.Circle() |> Geometry.Domain
         Γ   = boundary(Ω)
         M   = ParametricSurfaces.meshgen(Γ,(7,))
-        mesh = NystromMesh(view(M,Γ),order=5)
+        mesh = NystromMesh(view(M,Γ),order=3)
         xin = SVector(0.1,0.2)
         ops = (
             Laplace(;dim=2),
@@ -141,7 +141,7 @@ Random.seed!(1)
             Ddim  = Nystrom.assemble_dim(D)
             e1    = Nystrom.error_exterior_green_identity(Sdim,Ddim,γ₀u,γ₁u)/γ₀u_norm
             @testset "Single/double layer $(string(pde))" begin
-                @test norm(e0,Inf) > rtol
+                @test norm(e0,Inf) > norm(e1,Inf)
                 @test norm(e1,Inf) < rtol
             end
             # adjoint double-layer and hypersingular
@@ -164,8 +164,8 @@ Random.seed!(1)
         Geometry.clear_entities!()
         Ω   = ParametricSurfaces.Sphere(;radius=3) |> Geometry.Domain
         Γ   = boundary(Ω)
-        M   = ParametricSurfaces.meshgen(Γ,(2,2))
-        mesh = NystromMesh(view(M,Γ),order=5)
+        M   = ParametricSurfaces.meshgen(Γ,(4,4))
+        mesh = NystromMesh(view(M,Γ),order=3)
         xs = SVector(0.1,-0.1,0.2)
         ops = (
             Laplace(;dim=3),
@@ -192,7 +192,7 @@ Random.seed!(1)
             Ddim  = Nystrom.assemble_dim(D)
             e1    = Nystrom.error_exterior_green_identity(Sdim,Ddim,γ₀u,γ₁u)/γ₀u_norm
             @testset "Single/double layer $(string(pde))" begin
-                @test norm(e0,Inf) > rtol
+                @test norm(e0,Inf) > norm(e1,Inf)
                 @test norm(e1,Inf) < rtol
             end
             # adjoint double-layer and hypersingular
@@ -206,7 +206,7 @@ Random.seed!(1)
             Hdim  = Nystrom.assemble_dim(H)
             e1   = Nystrom.error_exterior_derivative_green_identity(Kdim,Hdim,γ₀u,γ₁u)/γ₁u_norm
             @testset "Adjoint double-layer/hypersingular $(string(pde))" begin
-                @test norm(e0,Inf) > rtol
+                @test norm(e0,Inf) > norm(e1,Inf)
                 @test norm(e1,Inf) < rtol
             end
         end

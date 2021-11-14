@@ -273,7 +273,7 @@ function _source_gen(iop,nsources;kfactor)
     Y      = source_surface(iop)
     pts    = dofs(Y)
     # create a bounding box
-    bbox   = bounding_box(pts)
+    bbox   = HyperRectangle(pts)
     xc     = center(bbox)
     d      = diameter(bbox)
     if N == 2
@@ -297,7 +297,7 @@ end
 
 function _circle_sources(;nsources, radius=10, center=SVector(0.,0.))
     par   = (s) -> center .+ radius .* SVector(cospi(2 * s[1]), sinpi(2 * s[1]))
-    x,_   = Integration._trapezoidalP(nsources)
+    x     = [i/(nsources) for i in 0:nsources-1]
     Xs    = SVector{2,Float64}[]
     for pt in x
         push!(Xs,par(pt))

@@ -1,4 +1,4 @@
-struct IntegralPotential{T<:AbstractKernel,S}
+struct IntegralPotential{T,S}
     kernel::T
     surface::S
 end

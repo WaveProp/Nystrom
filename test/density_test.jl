@@ -8,8 +8,9 @@ Random.seed!(1)
 @testset "Density test" begin
     Geometry.clear_entities!()
     pde   = Helmholtz(;dim=3,k=1)
-    Ω,M   = GmshSDK.sphere(dim=2)
-    Γ     = boundary(Ω)
+    Ω     = ParametricSurfaces.Sphere()
+    Γ     = boundary(Ω) |> Geometry.Domain
+    M     = ParametricSurfaces.meshgen(Γ,(10,10))
     mesh  = NystromMesh(view(M,Γ),order=1)
     σ     = Density(target->norm(coords(target)),mesh)
     @test eltype(σ) == Float64

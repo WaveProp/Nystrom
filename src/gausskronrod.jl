@@ -2,15 +2,22 @@
 # useful to verify that integrals converge as they should.
 
 function assemble_gk(iop;compress=Matrix)
-    out        = compress(iop)
-    correction = singular_weights_gk(iop)
+    X,Y       = target_surface(iop), source_surface(iop)
+    @timeit_debug "assemble dense part" begin
+        out        = compress(iop)
+    end
+    @timeit_debug "compute near interaction list" begin
+        dict_near = near_interaction_list(dofs(X),Y;atol=0.1)
+    end
+    @timeit_debug "compute singular correction" begin
+        correction = singular_weights_gk(iop,dict_near)
+    end
     axpy!(1,correction,out) # out <-- out + correction
 end
 
-function singular_weights_gk(iop::IntegralOperator)
+function singular_weights_gk(iop::IntegralOperator,dict_near)
     X,Y       = target_surface(iop), source_surface(iop)
     T         = eltype(iop)
-    dict_near = near_interaction_list(dofs(X),Y;atol=0.1)
     Is    = Int[]
     Js    = Int[]
     Vs    = T[]
@@ -19,13 +26,16 @@ function singular_weights_gk(iop::IntegralOperator)
         iter      = ElementIterator(Y,E)
         qreg      = Y.etype2qrule[E]
         lag_basis = lagrange_basis(qnodes(qreg))
-        _singular_weights_gk!(Is,Js,Vs,iop,iter,dict_near,lag_basis)
+        @timeit_debug "singular weights" begin
+            _singular_weights_gk!(Is,Js,Vs,iop,iter,dict_near,lag_basis,qreg)
+        end
     end
     Sp = sparse(Is,Js,Vs,size(iop)...)
     return Sp
 end
 
-function _singular_weights_gk!(Is,Js,Vs,iop,iter,dict_near,lag_basis)
+function _singular_weights_gk!(Is,Js,Vs,iop,iter,dict_near,lag_basis,qreg)
+    yi = qnodes(qreg)
     K = kernel(iop)
     X = target_surface(iop)
     Y = source_surface(iop)
@@ -37,9 +47,10 @@ function _singular_weights_gk!(Is,Js,Vs,iop,iter,dict_near,lag_basis)
     for (n,el) in enumerate(iter)               # loop over elements
         jglob = Y.elt2dof[E][:,n]
         for (i,jloc) in list_near[n]            # loop over near targets
+            ys = yi[jloc]
             xdof   = dofs(X)[i]
             for (m,l) in enumerate(lag_basis)   # loop over lagrange basis
-                val,_ = quadgk(0,1) do ŷ
+                val,_ = quadgk(0,ys[1],1;atol=1e-14) do ŷ
                     y    = el(ŷ)
                     jac  = jacobian(el,ŷ)
                     μ    = integration_measure(jac)
