@@ -14,4 +14,4 @@ using SafeTestsets
 
 @safetestset "Discrete operators" begin include("discreteoperator_test.jl") end
 
-@safetestset "IFGF" begin include("ifgf_test.jl") end
+# @safetestset "IFGF" begin include("ifgf_test.jl") end
