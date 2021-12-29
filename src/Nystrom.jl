@@ -9,6 +9,7 @@ using QuadGK
 using RecipesBase
 using TimerOutputs
 using Base.Threads
+import Lebedev  # to obtain the Lebedev points
 
 # module to handle some simple parametric geometries
 include("ParametricSurfaces/ParametricSurfaces.jl")
