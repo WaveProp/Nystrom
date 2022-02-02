@@ -3,30 +3,30 @@
 ####################################################################################
 
 # FIXME: this should probably be called a disk
-struct Circle <: AbstractEntity
+struct Disk <: AbstractEntity
     # dim = 2
     tag::Int
     center::SVector{2,Float64}
     radius::Float64
     boundary::Vector{ParametricEntity}
-    function Circle(t,c,r,bnd)
+    function Disk(t,c,r,bnd)
         ent = new(t,c,r,bnd)
         global_add_entity!(ent)
         return ent
     end
 end
 
-function Circle(;center=(0, 0),radius=1)
+function Disk(;center=(0, 0),radius=1)
     f          = (s) -> center .+ radius .* SVector(cospi(2 * s[1]), sinpi(2 * s[1]))
     domain     = HyperRectangle(0,1)
     ent        = ParametricEntity(f, domain)
     tag        = new_tag(2) # generate a unique tag for entities of dimension 2
-    return Circle(tag,center, radius, [ent])
+    return Disk(tag,center, radius, [ent])
 end
-Base.in(pt,circ::Circle) = norm(pt .- circ.center) < circ.radius
-key(ent::Circle) = (2,ent.tag)
-geometric_dimension(ent::Circle) = 2
-ambient_dimension(ent::Circle) = 2
+Base.in(pt,circ::Disk) = norm(pt .- circ.center) < circ.radius
+key(ent::Disk) = (2,ent.tag)
+geometric_dimension(ent::Disk) = 2
+ambient_dimension(ent::Disk) = 2
 
 struct Kite <: AbstractEntity
     # dim = 2
@@ -181,34 +181,34 @@ function Bean(;center=(0,0,0),paxis=(1,1,1))
     return Bean(tag,center,paxis,parts)
 end
 
-struct Cube <: AbstractEntity
+struct Box <: AbstractEntity
     # dim = 3
     tag::Int
     low_corner::SVector{3,Float64}
     widths::SVector{3,Float64}
     boundary::Vector{ParametricEntity}
-    function Cube(t,c,p,bnd)
+    function Box(t,c,p,bnd)
         ent = new(t,c,p,bnd)
         global_add_entity!(ent)
         return ent
     end
 end
 
-function Cube(;center=SVector(0,0,0),widths=(2,2,2))
+function Box(;center=SVector(0,0,0),widths=(2,2,2))
     nparts = 6
     domain = HyperRectangle((-1.,-1.),(1.,1.))
     parts  = Vector{ParametricEntity}(undef,nparts)
     for id=1:nparts
-        param     = (x) -> _cube_parametrization(x[1],x[2],id,widths,center)
+        param     = (x) -> _box_parametrization(x[1],x[2],id,widths,center)
         parts[id] = ParametricEntity(param,domain)
     end
     tag = new_tag(3)
-    return Cube(tag,center,widths,parts)
+    return Box(tag,center,widths,parts)
 end
-geometric_dimension(ent::Cube) = 3
-ambient_dimension(ent::Cube) = 3
+geometric_dimension(ent::Box) = 3
+ambient_dimension(ent::Box) = 3
 
-function _cube_parametrization(u,v,id,widths,center)
+function _box_parametrization(u,v,id,widths,center)
     @assert -1 ≤ u ≤ 1
     @assert -1 ≤ v ≤ 1
     if id==1

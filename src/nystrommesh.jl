@@ -4,8 +4,6 @@
 Structure containing information of a degree-of-freedom in Nyström methods.
 """
 struct NystromDOF{N,T,M,NM}
-    # index::Int64         # QNode global index
-    # element_index::Int64 # Index of the element to which QNode belongs
     coords::SVector{N,T}           # *Lifted* quadrature nodes
     weight::T                      # *Lifted* quadrature weigth
     jacobian::SMatrix{N,M,T,NM}    # Jacobian matrix at qnode
@@ -59,25 +57,35 @@ function Base.show(io::IO,msh::NystromMesh)
 end
 
 # getters
-elements(m::NystromMesh)             = m.elements
-elements(m::NystromMesh,E::DataType) = m.elements[E]
-etype2qrule(m)   = m.etype2qrule
-etype2qrule(m,E) = etype2qrule(m)[E]
-dofs(m::NystromMesh)  = m.dofs
-elt2dof(m::NystromMesh) = m.elt2dof
-elt2dof(m::NystromMesh,E::DataType) = m.elt2dof[E]
-ent2elt(m::NystromMesh) = m.ent2elt
+elements(m::NystromMesh)                    = m.elements
+elements(m::NystromMesh,E::DataType)        = m.elements[E]
+etype2qrule(m)                              = m.etype2qrule
+etype2qrule(m,E)                            = etype2qrule(m)[E]
+dofs(m::NystromMesh)                        = m.dofs
+elt2dof(m::NystromMesh)                     = m.elt2dof
+elt2dof(m::NystromMesh,E::DataType)         = m.elt2dof[E]
+ent2elt(m::NystromMesh)                     = m.ent2elt
 ent2elt(m::NystromMesh,ent::AbstractEntity) = m.ent2elt[ent]
 
 # generators for iterating over fields of dofs
-qcoords(m::NystromMesh)  = (coords(q) for q in dofs(m))
-qweights(m::NystromMesh) = (weight(q) for q in dofs(m))
+qcoords(m::NystromMesh)    = (coords(q) for q in dofs(m))
+qweights(m::NystromMesh)   = (weight(q) for q in dofs(m))
 qjacobians(m::NystromMesh) = (jacobian(q) for q in dofs(m))
-qnormals(m::NystromMesh) = (normal(q) for q in dofs(m))
+qnormals(m::NystromMesh)   = (normal(q) for q in dofs(m))
+
+"""
+    integrate(f,msh::NystromMesh)
+
+Compute `∑ᵢ f(xᵢ)wᵢ`, where the `xᵢ` are the `dofs` of `msh`, and `wᵢ` are its
+`qweights`.
+"""
+function Integration.integrate(f,msh::NystromMesh)
+    Integration.integrate(f,dofs(msh),qweights(msh))
+end
 
 # entities and domain
 Geometry.entities(mesh::NystromMesh) = collect(keys(mesh.ent2elt))
-domain(mesh::NystromMesh)   = Domain(entities(mesh))
+domain(mesh::NystromMesh)            = Domain(entities(mesh))
 
 Base.keys(m::NystromMesh) = keys(elements(m))
 
@@ -105,7 +113,7 @@ dom2dof(mesh,ent::AbstractEntity) = dom2dof(mesh,Domain(ent))
 
 ent2dof(mesh,ent::AbstractEntity) = dom2dof(mesh,ent)
 
-function NystromMesh(msh::AbstractMesh{N,T},Ω::Domain,e2qrule) where {N,T}
+function NystromMesh(msh::AbstractMesh{N,T},Ω::Domain,e2qrule::Dict) where {N,T}
     # initialize mesh with empty fields
     M       = geometric_dimension(Ω) |> Int
     NM      = N*M
@@ -134,13 +142,20 @@ function NystromMesh(msh::AbstractMesh{N,T},Ω::Domain,e2qrule) where {N,T}
     end
     return nys_msh
 end
-function NystromMesh(msh::GenericMesh, Ω::Domain;order)
+function NystromMesh(msh::GenericMesh,Ω::Domain=domain(msh);order)
     etypes = keys(view(msh,Ω))
     e2qrule = Dict(E=>qrule_for_reference_shape(domain(E),order) for E in etypes)
     NystromMesh(msh,Ω,e2qrule)
 end
 function NystromMesh(submesh::SubMesh,args...;kwargs...)
     NystromMesh(parent(submesh),domain(submesh),args...;kwargs...)
+end
+
+# convenience contructor with a single quadrature rule
+function NystromMesh(msh::GenericMesh, Ω::Domain, qrule::AbstractQuadratureRule)
+    etypes = keys(view(msh,Ω))
+    e2qrule = Dict(E=>qrule for E in etypes)
+    NystromMesh(msh,Ω,e2qrule)
 end
 
 @noinline function _build_nystrom_mesh!(msh,iter::ElementIterator,qrule::AbstractQuadratureRule)

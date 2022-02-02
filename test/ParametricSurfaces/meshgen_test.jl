@@ -2,7 +2,7 @@ using Test
 using Nystrom.ParametricSurfaces
 
 @testset "Disk" begin
-    disk = ParametricSurfaces.Circle() # abstract entity
+    disk = ParametricSurfaces.Disk() # abstract entity
     Γ = boundary(disk) |> Domain
     M = meshgen(Γ,(10,))
     # plot(M,Γ)
