@@ -1,6 +1,8 @@
 using SafeTestsets
 
-@safetestset "Nystrom mesh" begin include("nystrommesh_test.jl") end
+@safetestset "ParametricSurfaces" begin include("ParametricSurfaces/runtests.jl") end
+
+@safetestset "NystromMesh" begin include("nystrommesh_test.jl") end
 
 @safetestset "Kernels" begin include("kernels_test.jl") end
 
@@ -12,6 +14,6 @@ using SafeTestsets
 
 @safetestset "Density interpolation method" begin include("dim_test.jl") end
 
-@safetestset "Discrete operators" begin include("discreteoperator_test.jl") end
+# @safetestset "Discrete operators" begin include("discreteoperator_test.jl") end
 
 # @safetestset "IFGF" begin include("ifgf_test.jl") end
