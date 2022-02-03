@@ -113,6 +113,20 @@ dom2dof(mesh,ent::AbstractEntity) = dom2dof(mesh,Domain(ent))
 
 ent2dof(mesh,ent::AbstractEntity) = dom2dof(mesh,ent)
 
+function dof2el(msh::NystromMesh)
+    out = similar(dofs(msh),Tuple{DataType,Int})
+    for (E,dofs) in elt2dof(msh)
+        ndofs,nel = size(dofs)
+        for j in 1:nel
+            for i in 1:ndofs
+                out[dofs[i,j]] = (E,j)
+            end
+        end
+    end
+    return out
+end
+
+# low-level constructor explicitly requiring a quadrature for each element type
 function NystromMesh(msh::AbstractMesh{N,T},Ω::Domain,e2qrule::Dict) where {N,T}
     # initialize mesh with empty fields
     M       = geometric_dimension(Ω) |> Int
@@ -142,6 +156,14 @@ function NystromMesh(msh::AbstractMesh{N,T},Ω::Domain,e2qrule::Dict) where {N,T
     end
     return nys_msh
 end
+
+"""
+    NystromMesh(msh::GenericMesh[, Ω=domain(msh)]; order)
+
+Create a `NystromMesh` for all elements in `msh` which belong to the `Domain`
+`Ω`. The keyword argument `order` specifies the desired quadrature order, which
+is selected based on the [`qrule_for_reference_shapw`](@ref) method.
+"""
 function NystromMesh(msh::GenericMesh,Ω::Domain=domain(msh);order)
     etypes = keys(view(msh,Ω))
     e2qrule = Dict(E=>qrule_for_reference_shape(domain(E),order) for E in etypes)

@@ -22,11 +22,45 @@ function assemble_dim(iop::IntegralOperator;compression=Matrix,location=:onsurfa
     Op1, Op2       = _auxiliary_operators_dim(iop,compression)
     # sparse correction
     basis,γ₁_basis = _basis_dim(iop)
-    dict_near      = near_interaction_list(dofs(X),Y;atol=0)
+    dict_near      = _near_interaction_list_dim(iop,location)
     γ₀B,γ₁B,R      = _auxiliary_quantities_dim(iop,Op1,Op2,basis,γ₁_basis,σ)
     correction     = _singular_weights_dim(iop,γ₀B,γ₁B,R,dict_near)
     a,b            = combined_field_coefficients(iop)
     return (a*Op1 + b*Op2 + correction)
+end
+
+"""
+    _near_interaction_list_dim(iop,location)
+
+For each element `el` in the `source_surface` of `iop`, return the indices of
+the nodes in the `target_surface` for which `el` is the closest element. This
+map gives the indices in `iop` that need to be corrected by the `dim`
+quadrature when integrating over `el`.
+"""
+function _near_interaction_list_dim(iop,location)
+    dict = Dict{DataType,Vector{Vector{Int}}}()
+    X,Y = target_surface(iop), source_surface(iop)
+    if X === Y
+        # when both surfaces are the same, the "near points" of an element are
+        # simply its own quadrature points
+        for (E,dofs) in elt2dof(Y)
+            dict[E] = map(i->collect(i),eachcol(dofs))
+        end
+    else
+        # FIXME: this case is a lot less common, but deserves some attention.
+        # The idea is that we should find, for each target point, the closest
+        # that is less than a tolerance `atol` (there may be none). We then
+        # revert this map to build a map where for each element in `Y`, we store
+        # a vector of the target indices for which that element is the closest
+        # since this is what is needed by the `dim` methods as implemented here.
+        target2source = nearest_neighbor(dofs(X),dofs(Y))
+        source2el = dof2el(Y)
+        for (i,s) in enumerate(target2source)
+            E,n = source2el[s]
+            push!(dict[E][n],i)
+        end
+    end
+    return dict
 end
 
 """
@@ -122,6 +156,9 @@ function _singular_weights_dim(iop::IntegralOperator,γ₀B,γ₁B,R,dict_near)
         M                     = Matrix{T}(undef,2*num_qnodes,num_basis)
         @assert length(list_near) == num_els
         for n in 1:num_els
+            # if there is nothing near, skip immediately to next element
+            isempty(list_near[n]) && continue
+            # there are entries to correct, so do some work
             j_glob                = @view el2qnodes[:,n]
             M[1:num_qnodes,:]     = @view γ₀B[j_glob,:]
             M[num_qnodes+1:end,:] = @view γ₁B[j_glob,:]
@@ -134,7 +171,7 @@ function _singular_weights_dim(iop::IntegralOperator,γ₀B,γ₁B,R,dict_near)
             else
                 error("unknown element type T=$T")
             end
-            for (i,_) in list_near[n]
+            for i in list_near[n]
                 if T <: Number
                     tmp = ((R[i:i,:])/F.R)*adjoint(F.Q)
                 elseif T <: SMatrix
