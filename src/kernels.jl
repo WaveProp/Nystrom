@@ -1,6 +1,6 @@
 abstract type AbstractPDE{N} end
 
-Geometry.ambient_dimension(pde::AbstractPDE{N}) where {N} = N
+ambient_dimension(::AbstractPDE{N}) where {N} = N
 
 """
     abstract type AbstractKernel{T}
@@ -88,21 +88,54 @@ end
 HyperSingularKernel{T}(op) where {T} = HyperSingularKernel{T,typeof(op)}(op)
 HyperSingularKernel(op)              = HyperSingularKernel{default_kernel_eltype(op)}(op)
 
-# a trait for the kernel type
-struct SingleLayer end
-struct DoubleLayer end
-struct AdjointDoubleLayer end
-struct HyperSingular end
+"""
+    struct DerivativeCombinedFieldKernel{T,Op,A,B} <: AbstractKernel{T}
 
-kernel_type(::SingleLayerKernel)        = SingleLayer()
-kernel_type(::DoubleLayerKernel)        = DoubleLayer()
-kernel_type(::AdjointDoubleLayerKernel) = AdjointDoubleLayer()
-kernel_type(::HyperSingularKernel)      = HyperSingular()
+Linear combination of single- and double-layer kernels given by
+`A*SingleLayerKernel + B*DoubleLayerKernel`
+"""
+struct CombinedFieldKernel{T,Op,A,B} <: AbstractKernel{T}
+    pde::Op
+end
 
-combined_field_coefficients(::SingleLayerKernel)        = (0,-1)
-combined_field_coefficients(::DoubleLayerKernel)        = (1,0)
-combined_field_coefficients(::AdjointDoubleLayerKernel) = (0,-1)
-combined_field_coefficients(::HyperSingularKernel)      = (1,0)
+function (CF::CombinedFieldKernel{T,Op,A,B})(target,source)::T where {T,Op,A,B}
+    SL = SingleLayerKernel{T,Op}(CF.pde)
+    DL = DoubleLayerKernel{T,Op}(CF.pde)
+    A*SL(target,source) + B*DL(target,source)
+end
+
+"""
+    struct DerivativeCombinedFieldKernel{T,Op,A,B} <: AbstractKernel{T}
+
+Linear combination of adjoint double-layer and hypersingular kernels given by
+`A*AdjointDoubleLayerKernel + B*HyperSingularKernel`
+"""
+struct DerivativeCombinedFieldKernel{T,Op,A,B} <: AbstractKernel{T}
+    pde::Op
+end
+
+function (CF::DerivativeCombinedFieldKernel{T,Op,A,B})(target,source)::T where {T,Op,A,B}
+    adjD = AdjointDoubleLayerKernel{T,Op}(CF.pde)
+    H    = HyperSingularKernel{T,Op}(CF.pde)
+    A*adjD(target,source) + B*H(target,source)
+end
+
+# traits for the kernel type
+struct CombinedField{A,B} end
+struct DerivativeCombinedField{A,B} end
+const SingleLayer = CombinedField{1,0}
+const DoubleLayer = CombinedField{0,1}
+const AdjointDoubleLayer = DerivativeCombinedField{1,0}
+const HyperSingular = DerivativeCombinedField{0,1}
+
+kernel_type(::SingleLayerKernel)        = CombinedField{1,0}()
+kernel_type(::DoubleLayerKernel)        = CombinedField{0,1}()
+kernel_type(::AdjointDoubleLayerKernel) = DerivativeCombinedField{1,0}()
+kernel_type(::HyperSingularKernel)      = DerivativeCombinedField{0,1}()
+
+combined_field_coefficients(k::AbstractKernel)                          = combined_field_coefficients(kernel_type(k))
+combined_field_coefficients(::CombinedField{A,B}) where {A,B}           = (A,B)
+combined_field_coefficients(::DerivativeCombinedField{A,B}) where {A,B} = (A,B)
 
 ################################################################################
 ################################# LAPLACE ######################################
