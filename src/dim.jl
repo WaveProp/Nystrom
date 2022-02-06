@@ -153,50 +153,57 @@ function _basis_dim(iop)
 end
 
 function _singular_weights_dim(iop::IntegralOperator,γ₀B,γ₁B,R,dict_near)
-    X,Y = target_surface(iop), source_surface(iop)
+    # initialize vectors for the sparse matrix, then dispatch to type-stable
+    # method for each element type
     T   = eltype(iop)
-    num_basis = size(γ₀B,2)
-    a,b = combined_field_coefficients(iop)
-    # we now have the residue R. For the correction we need the coefficients.
     Is = Int[]
     Js = Int[]
     Vs = T[]
     for (E,list_near) in dict_near
-        el2qnodes = elt2dof(Y,E)
-        num_qnodes, num_els   = size(el2qnodes)
-        M                     = Matrix{T}(undef,2*num_qnodes,num_basis)
-        @assert length(list_near) == num_els
-        for n in 1:num_els
-            j_glob                = @view el2qnodes[:,n]
-            M[1:num_qnodes,:]     = @view γ₀B[j_glob,:]
-            M[num_qnodes+1:end,:] = @view γ₁B[j_glob,:]
-            # distinguish scalar and vectorial case
-            if T <: Number
-                F                     = qr(M)
-            elseif T <: SMatrix
-                M_mat = blockmatrix_to_matrix(M)
-                F                     = qr!(M_mat)
-            else
-                error("unknown element type T=$T")
-            end
-            for (i,_) in list_near[n]
-                if T <: Number
-                    tmp = ((R[i:i,:])/F.R)*adjoint(F.Q)
-                elseif T <: SMatrix
-                    tmp_scalar  = (blockmatrix_to_matrix(R[i:i,:])/F.R)*adjoint(F.Q)
-                    tmp  = matrix_to_blockmatrix(tmp_scalar,T)
-                else
-                    error("unknown element type T=$T")
-                end
-                w    = axpby!(a,view(tmp,1:num_qnodes),b,view(tmp,(num_qnodes+1):(2*num_qnodes)))
-                append!(Is,fill(i,num_qnodes))
-                append!(Js,j_glob)
-                append!(Vs,w)
-            end
-        end
+        _singular_weights_dim!(Is,Js,Vs,iop,γ₀B,γ₁B,R,E,list_near)
     end
     Sp = sparse(Is,Js,Vs,size(iop)...)
     return Sp
+end
+
+@noinline function _singular_weights_dim!(Is,Js,Vs,iop,γ₀B,γ₁B,R,E,list_near)
+    X,Y = target_surface(iop), source_surface(iop)
+    T   = eltype(iop)
+    num_basis = size(γ₀B,2)
+    a,b = combined_field_coefficients(iop)
+    el2qnodes = elt2dof(Y,E)
+    num_qnodes, num_els   = size(el2qnodes)
+    M                     = Matrix{T}(undef,2*num_qnodes,num_basis)
+    @assert length(list_near) == num_els
+    for n in 1:num_els
+        j_glob                = @view el2qnodes[:,n]
+        M[1:num_qnodes,:]     = @view γ₀B[j_glob,:]
+        M[num_qnodes+1:end,:] = @view γ₁B[j_glob,:]
+        # distinguish scalar and vectorial case
+        if T <: Number
+            F                     = qr(M)
+        elseif T <: SMatrix
+            M_mat = blockmatrix_to_matrix(M)
+            F                     = qr!(M_mat)
+        else
+            error("unknown element type T=$T")
+        end
+        for (i,_) in list_near[n]
+            if T <: Number
+                tmp = ((R[i:i,:])/F.R)*adjoint(F.Q)
+            elseif T <: SMatrix
+                tmp_scalar  = (blockmatrix_to_matrix(R[i:i,:])/F.R)*adjoint(F.Q)
+                tmp  = matrix_to_blockmatrix(tmp_scalar,T)
+            else
+                error("unknown element type T=$T")
+            end
+            w    = axpby!(a,view(tmp,1:num_qnodes),b,view(tmp,(num_qnodes+1):(2*num_qnodes)))
+            append!(Is,fill(i,num_qnodes))
+            append!(Js,j_glob)
+            append!(Vs,w)
+        end
+    end
+    return Is,Js,Vs
 end
 
 function _singular_weights_dim_maxwell(iop::IntegralOperator,γ₀B,γ₁B,R,dict_near)
