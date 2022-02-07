@@ -44,6 +44,8 @@ SingleLayerOperator(op::AbstractPDE,X,Y=X)        = IntegralOperator(SingleLayer
 DoubleLayerOperator(op::AbstractPDE,X,Y=X)        = IntegralOperator(DoubleLayerKernel(op), X, Y)
 AdjointDoubleLayerOperator(op::AbstractPDE,X,Y=X) = IntegralOperator(AdjointDoubleLayerKernel(op), X, Y)
 HyperSingularOperator(op::AbstractPDE,X,Y=X)      = IntegralOperator(HyperSingularKernel(op), X, Y)
+CombinedFieldOperator(op::AbstractPDE,X,Y=X;α,β)  = IntegralOperator(CombinedFieldKernel(op,α,β), X, Y)
+AdjointCombinedFieldOperator(op::AbstractPDE,X,Y=X;α,β)  = IntegralOperator(AdjointCombinedFieldKernel(op,α,β), X, Y)
 
 ambient_dimension(iop::IntegralOperator) = ambient_dimension(iop.kernel)
 

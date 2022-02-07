@@ -23,3 +23,7 @@ Base.getindex(pot::IntegralPotential,σ::AbstractVector) = (x) -> pot(σ,x)
 
 SingleLayerPotential(op::AbstractPDE,surf) = IntegralPotential(SingleLayerKernel(op),surf)
 DoubleLayerPotential(op::AbstractPDE,surf) = IntegralPotential(DoubleLayerKernel(op),surf)
+AdjointDoubleLayerPotential(op::AbstractPDE,surf) = IntegralPotential(AdjointDoubleLayerKernel(op),surf)
+HyperSingularPotential(op::AbstractPDE,surf)      = IntegralPotential(HyperSingularKernel(op),surf)
+CombinedFieldPotential(op::AbstractPDE,surf;α,β)  = IntegralPotential(CombinedFieldKernel(op,α,β),surf)
+AdjointCombinedFieldPotential(op::AbstractPDE,surf;α,β)  = IntegralPotential(AdjointCombinedFieldKernel(op,α,β),surf)

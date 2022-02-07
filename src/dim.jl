@@ -138,8 +138,8 @@ end
 function _singular_weights_dim(op1::IntegralOperator,op2::IntegralOperator,γ₀B,γ₁B,R,dict_near)
     # initialize vectors for the sparse matrix, then dispatch to type-stable
     # method for each element type
-    @assert (kernel(op1) isa SingleLayerKernel && kernel(op2) isa DoubleLayerKernel) ||
-            (kernel(op1) isa AdjointDoubleLayerKernel && kernel(op2) isa HyperSingularKernel)
+    @assert (kernel_type(op1) isa SingleLayer && kernel_type(op2) isa DoubleLayer) ||
+            (kernel_type(op1) isa AdjointDoubleLayer && kernel_type(op2) isa HyperSingular)
     Y  = source_surface(op1)
     T  = eltype(op1)
     sizeop = size(op1)
