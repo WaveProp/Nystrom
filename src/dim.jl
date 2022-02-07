@@ -38,11 +38,9 @@ function single_doublelayer_dim(pde,X,Y=X;compress=Matrix,location=:onsurface)
     # compute corrections
     @timeit_debug "compute dim correction" begin
         if pde isa Maxwell
-            δS = _singular_weights_dim_maxwell(Sop,γ₀B,γ₁B,R,dict_near)
-            δD = _singular_weights_dim_maxwell(Dop,γ₀B,γ₁B,R,dict_near)
+            δS,δD = _singular_weights_dim_maxwell(Sop,Dop,γ₀B,γ₁B,R,dict_near)
         else
-            δS = _singular_weights_dim(Sop,γ₀B,γ₁B,R,dict_near)
-            δD = _singular_weights_dim(Dop,γ₀B,γ₁B,R,dict_near)
+            δS,δD = _singular_weights_dim(Sop,Dop,γ₀B,γ₁B,R,dict_near)
         end
     end
     # convert to DiscreteOp
@@ -67,8 +65,7 @@ function adjointdoublelayer_hypersingular_dim(pde,X,Y=X;compress=Matrix,location
     basis,γ₁_basis = _basis_dim(Kop)
     γ₀B,γ₁B,R      = _auxiliary_quantities_dim(Kop,K,H,basis,γ₁_basis,σ)
     # compute corrections
-    δK        = _singular_weights_dim(Kop,γ₀B,γ₁B,R,dict_near)
-    δH        = _singular_weights_dim(Hop,γ₀B,γ₁B,R,dict_near)
+    δK,δH        = _singular_weights_dim(Kop,Hop,γ₀B,γ₁B,R,dict_near)
     # convert to DiscreteOp
     K_discrete = DiscreteOp(K) + DiscreteOp(δK)
     H_discrete = DiscreteOp(H) + DiscreteOp(δH)
@@ -76,19 +73,6 @@ function adjointdoublelayer_hypersingular_dim(pde,X,Y=X;compress=Matrix,location
 end
 adjointdoublelayer_dim(args...;kwargs...)  = adjointdoublelayer_hypersingular_dim(args...;kwargs...)[1]
 hypersingular_dim(args...;kwargs...)       = adjointdoublelayer_hypersingular_dim(args...;kwargs...)[2]
-
-
-function singular_weights_dim(iop::IntegralOperator,compress=Matrix)
-    X,Y,op = iop.X, iop.Y, iop.kernel.op
-    σ = X == Y ? -0.5 : 0.0
-    #
-    dict_near = near_interaction_list(dofs(X),Y;atol=0)
-    basis,γ₁_basis = _basis_dim(iop)
-    Op1, Op2       = _auxiliary_operators_dim(iop,compress)
-    γ₀B,γ₁B,R      = _auxiliary_quantities_dim(iop,Op1,Op2,basis,γ₁_basis,σ)
-    Sp = _singular_weights_dim(iop,γ₀B,γ₁B,R,dict_near)
-    return Sp # a sparse matrix
-end
 
 function _auxiliary_quantities_dim(iop,Op0,Op1,basis,γ₁_basis,σ)
     T      = eltype(iop)
@@ -107,7 +91,6 @@ function _auxiliary_quantities_dim(iop,Op0,Op1,basis,γ₁_basis,σ)
     # integrate the basis over Y
     xnodes      = dofs(X)
     num_targets = length(xnodes)
-    num_sources = length(ynodes)
     R = Matrix{T}(undef,num_targets,num_basis)
     @timeit_debug "integrate dim basis" begin
         @threads for k in 1:num_basis
@@ -152,25 +135,33 @@ function _basis_dim(iop)
     return basis,γ₁_basis
 end
 
-function _singular_weights_dim(iop::IntegralOperator,γ₀B,γ₁B,R,dict_near)
+function _singular_weights_dim(op1::IntegralOperator,op2::IntegralOperator,γ₀B,γ₁B,R,dict_near)
     # initialize vectors for the sparse matrix, then dispatch to type-stable
     # method for each element type
-    T   = eltype(iop)
+    @assert (kernel(op1) isa SingleLayerKernel && kernel(op2) isa DoubleLayerKernel) ||
+            (kernel(op1) isa AdjointDoubleLayerKernel && kernel(op2) isa HyperSingularKernel)
+    Y  = source_surface(op1)
+    T  = eltype(op1)
+    sizeop = size(op1)
     Is = Int[]
     Js = Int[]
-    Vs = T[]
+    Ss = T[]  # for single layer / adjoint double layer
+    Ds = T[]  # for double layer / hypersingular
     for (E,list_near) in dict_near
-        _singular_weights_dim!(Is,Js,Vs,iop,γ₀B,γ₁B,R,E,list_near)
+        _singular_weights_dim!(Is,Js,Ss,Ds,Y,γ₀B,γ₁B,R,E,list_near)
     end
-    Sp = sparse(Is,Js,Vs,size(iop)...)
-    return Sp
+    # for single layer / adjoint double layer
+    _,b = combined_field_coefficients(op1)
+    Sp = sparse(Is,Js,b*Ss,sizeop...) 
+    # for double layer / hypersingular
+    a,_ = combined_field_coefficients(op2)
+    Dp = sparse(Is,Js,a*Ds,sizeop...) 
+    return Sp, Dp
 end
 
-@noinline function _singular_weights_dim!(Is,Js,Vs,iop,γ₀B,γ₁B,R,E,list_near)
-    X,Y = target_surface(iop), source_surface(iop)
-    T   = eltype(iop)
+@noinline function _singular_weights_dim!(Is,Js,Ss,Ds,Y,γ₀B,γ₁B,R,E,list_near)
+    T = eltype(Ss)
     num_basis = size(γ₀B,2)
-    a,b = combined_field_coefficients(iop)
     el2qnodes = elt2dof(Y,E)
     num_qnodes, num_els   = size(el2qnodes)
     M                     = Matrix{T}(undef,2*num_qnodes,num_basis)
@@ -197,41 +188,49 @@ end
             else
                 error("unknown element type T=$T")
             end
-            w    = axpby!(a,view(tmp,1:num_qnodes),b,view(tmp,(num_qnodes+1):(2*num_qnodes)))
             append!(Is,fill(i,num_qnodes))
             append!(Js,j_glob)
-            append!(Vs,w)
+            append!(Ss,view(tmp,(num_qnodes+1):(2*num_qnodes)))
+            append!(Ds,view(tmp,1:num_qnodes))
         end
     end
-    return Is,Js,Vs
+    return Is,Js,Ss,Ds
 end
 
-function _singular_weights_dim_maxwell(iop::IntegralOperator,γ₀B,γ₁B,R,dict_near)
+function _singular_weights_dim_maxwell(Sop::IntegralOperator,Dop::IntegralOperator,γ₀B,γ₁B,R,dict_near)
     # initialize vectors for the sparse matrix, then dispatch to type-stable
     # method for each element type
-    T   = eltype(iop)
+    Y = source_surface(Sop)
+    T  = eltype(Sop)
+    sizeop = size(Sop)
     Is = Int[]
     Js = Int[]
-    Vs = T[]
+    Ss = T[]  # for single layer
+    Ds = T[]  # for double layer
     for (E,list_near) in dict_near
-        _singular_weights_dim_maxwell!(Is,Js,Vs,iop,γ₀B,γ₁B,R,E,list_near)
+        _singular_weights_dim_maxwell!(Is,Js,Ss,Ds,Y,γ₀B,γ₁B,R,E,list_near)
     end
-    Sp = sparse(Is,Js,Vs,size(iop)...)
-    return Sp
+    # for single layer
+    _,b = combined_field_coefficients(Sop)
+    Sp = sparse(Is,Js,b*Ss,sizeop...) 
+    # for double layer
+    a,_ = combined_field_coefficients(Dop)
+    Dp = sparse(Is,Js,a*Ds,sizeop...) 
+    return Sp, Dp
 end
 
-@noinline function _singular_weights_dim_maxwell!(Is,Js,Vs,iop,γ₀B,γ₁B,R,E,list_near)
-    X,Y    = target_surface(iop), source_surface(iop)
+@noinline function _singular_weights_dim_maxwell!(Is,Js,Ss,Ds,Y,γ₀B,γ₁B,R,E,list_near)
     qnodes = dofs(Y)
-    T   = eltype(iop)
-    a,b = combined_field_coefficients(iop)
     el2qnodes = elt2dof(Y,E)
     num_qnodes, num_els   = size(el2qnodes)
     num_basis = size(γ₀B,2)
+    T = eltype(Ss)
     T2 = SMatrix{2,3,ComplexF64,6}
     T3 = SMatrix{3,2,ComplexF64,6}
     M      = Matrix{T2}(undef,2*num_qnodes,num_basis)
     M_mat  = Matrix{ComplexF64}(undef,2*2*num_qnodes,3*num_basis)
+    ws     = Vector{T}(undef,num_qnodes)  # for single layer
+    wd     = Vector{T}(undef,num_qnodes)  # for double layer
     @assert length(list_near) == num_els
     for n in 1:num_els
         j_glob                = @view el2qnodes[:,n]
@@ -249,19 +248,18 @@ end
         for (i,_) in list_near[n]
             tmp_scalar  = (blockmatrix_to_matrix(R[i:i,:])/F.R)*adjoint(F.Q)
             tmp         = matrix_to_blockmatrix(tmp_scalar,T3)
-            tmp         = axpby!(a,view(tmp,1:num_qnodes),b,view(tmp,(num_qnodes+1):(2*num_qnodes)))
-            w           = Vector{T}(undef,num_qnodes)
             for k in 1:num_qnodes
-                # J,_ = jacobian(qnodes[j_glob[k]]) |> qr
                 J    = jacobian(qnodes[j_glob[k]])
-                w[k] = tmp[k]*transpose(J)
+                wd[k] = tmp[k]*transpose(J)
+                ws[k] = tmp[k+num_qnodes]*transpose(J)
             end
             append!(Is,fill(i,num_qnodes))
             append!(Js,j_glob)
-            append!(Vs,w)
+            append!(Ss,ws)
+            append!(Ds,wd)
         end
     end
-    return Is,Js,Vs
+    return Is,Js,Ss,Ds
 end
 
 function _source_gen(iop::IntegralOperator,kfactor=5)
