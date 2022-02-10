@@ -4,6 +4,8 @@ using SafeTestsets
 
 @safetestset "Kernels" begin include("kernels_test.jl") end
 
+@safetestset "BlockIndexer" begin include("blockindexer_test.jl") end
+
 @safetestset "Density" begin include("density_test.jl") end
 
 @safetestset "Potentials" begin include("potential_test.jl") end

@@ -70,6 +70,7 @@ WavePropBase.@export_interface
 include("utils.jl")
 include("nystrommesh.jl")
 include("kernels.jl")
+include("blockindexer.jl")
 include("density.jl")
 include("potential.jl")
 include("integraloperator.jl")
