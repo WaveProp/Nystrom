@@ -9,8 +9,8 @@ Random.seed!(1)
     n,m = 30,25
     nblock,mblock = 3,5
     @test (n,m) .% (nblock,mblock) == (0,0)
-    A = rand(n,m)
-    T = SMatrix{nblock,mblock,Float64,nblock*mblock}
+    A = rand(ComplexF64,n,m)
+    T = SMatrix{nblock,mblock,ComplexF64,nblock*mblock}
     Ablock = Nystrom.BlockIndexer(A,T)
     @test Matrix(Ablock) === A
     @test Nystrom.BlockIndexer(A,eltype(A)) === A
@@ -40,4 +40,31 @@ Random.seed!(1)
     @test size(C) == (n,m)
     @test C===Cblock
     @test C isa Matrix{eltype(S)}
+end
+
+@testset "blocksparse test" begin
+    n,m = 30,25
+    nblock,mblock = 3,5
+    @test (n,m) .% (nblock,mblock) == (0,0)
+    A = rand(ComplexF64,n,m)
+    T = SMatrix{nblock,mblock,ComplexF64,nblock*mblock}
+    Ablock = Nystrom.BlockIndexer(A,T)
+
+    entries = 5
+    I = rand(1:size(Ablock,1),entries)
+    J = rand(1:size(Ablock,2),entries)
+    V = [Ablock[i,j] for (i,j) in zip(I,J)]
+    Asparse = Nystrom.blocksparse(I,J,V,size(Ablock)...)
+    @test Asparse isa SparseMatrixCSC{eltype(A)}
+    @test nnz(Asparse) == entries*length(eltype(Ablock))
+    mask = Asparse.!=0
+    @test Asparse[mask] == A[mask]
+
+    # Scalar case
+    I = rand(1:size(A,1),entries)
+    J = rand(1:size(A,2),entries)
+    V = [A[i,j] for (i,j) in zip(I,J)]
+    A1 = Nystrom.blocksparse(I,J,V,size(A)...)
+    A2 = sparse(I,J,V,size(A)...)
+    @test A1 == A2
 end
