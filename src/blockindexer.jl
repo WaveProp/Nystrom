@@ -74,29 +74,60 @@ function MatrixAndBlockIndexer(T::Type{<:Number},n::Integer,m::Integer)
 end
 
 """
-    blocksparse(I, J, V::Vector{T}, n::Integer,m::Integer) where {T<:SMatrix}
-    blocksparse(I, J, V::Vector{<:Number}, n::Integer,m::Integer)
+    struct BlockSparseConstructor{T<:Union{SMatrix,Number},S<:Number}
 
-Similar to `SparseArrays.sparse`, but `V` is a vector of `SMatrix` blocks and both I` and `J`
-are vectors of indices in "block"-coordinates. A `SparseMatrixCSC{<:Scalar}` is returned.
+Convenient structure used to incrementally build a `SparseMatrixCSC{S}` from "block"-indices
+and blocks of type `T` with `eltype(T)==S`. First, create a `b::BlockSparseConstructor` and add entries 
+using the `addentry!(b::BlockSparseConstructor{T},i::Integer,j::Integer,v::T)` or `addentries!` functions.
+Then, convert it into a sparse matrix with `sparse(b)`.
 """
-function blocksparse(I, J, V::Vector{T}, n::Integer,m::Integer) where {T<:SMatrix}
-    S = eltype(T)
-    nmatrix,mmatrix = (n,m) .* size(T)
-    Iscalar = Int[]
-    Jscalar = Int[]
-    Vscalar = S[]
-    for (i,j,v) in zip(I,J,V)
-        append!(Vscalar,v)
-        irange,jrange = _blockindex2index(T,i,j)
-        cart_ind = Tuple.(CartesianIndices((irange,jrange)))
-        for (i,j) in cart_ind
-            push!(Iscalar,i)
-            push!(Jscalar,j)
-        end
+struct BlockSparseConstructor{T<:Union{SMatrix,Number},S<:Number}
+    size::Tuple{Int,Int}
+    I::Vector{Int}
+    J::Vector{Int}
+    V::Vector{S}
+    function BlockSparseConstructor{T,S}(n,m) where {T,S}
+        @assert (isconcretetype(T)&&isconcretetype(S)) "element types must be concrete"
+        @assert (S===eltype(T)) "element type of block `T` and scalar type `S` are not equal"
+        I = Int[]
+        J = Int[]
+        V = S[]
+        return new((n,m),I,J,V)
     end
-    return sparse(Iscalar,Jscalar,Vscalar,nmatrix,mmatrix)
 end
-function blocksparse(I, J, V::Vector{<:Number}, n::Integer,m::Integer)
-    return sparse(I,J,V,n,m)
+BlockSparseConstructor(T,n,m) = BlockSparseConstructor{T,eltype(T)}(n,m)
+
+Base.size(b::BlockSparseConstructor)   = b.size
+Base.size(b::BlockSparseConstructor,i) = size(b)[i]
+
+Base.eltype(::BlockSparseConstructor{T}) where T = T
+
+SparseArrays.sparse(b::BlockSparseConstructor{T}) where {T<:SMatrix} = sparse(b.I,b.J,b.V,(size(b).*size(T))...)
+SparseArrays.sparse(b::BlockSparseConstructor{T}) where {T<:Number}  = sparse(b.I,b.J,b.V,size(b)...)
+
+addentry!(::BlockSparseConstructor,i,j,v) = error()
+function addentry!(b::BlockSparseConstructor{T},i::Integer,j::Integer,v::T) where {T<:SMatrix}
+    append!(b.V, v)
+    irange,jrange = _blockindex2index(T,i,j)
+    cart_ind = CartesianIndices((irange,jrange))
+    for index in cart_ind
+        i,j = Tuple(index)
+        push!(b.I, i)
+        push!(b.J, j)
+    end
+end
+function addentry!(b::BlockSparseConstructor,i::Integer,j::Integer,v::Number)
+    push!(b.I, i)
+    push!(b.J, j)
+    push!(b.V, v)
+    return nothing
+end
+function addentries!(b::BlockSparseConstructor,
+                     I::AbstractVector{<:Integer},
+                     J::AbstractVector{<:Integer},
+                     V::AbstractVector)
+    @assert length(I) == length(J) == length(V)
+    for (i,j,v) in zip(I,J,V)
+        addentry!(b,i,j,v)
+    end
 end

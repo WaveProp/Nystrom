@@ -3,6 +3,7 @@ using StaticArrays
 using Random
 using Nystrom
 using LinearAlgebra
+using SparseArrays
 Random.seed!(1)
 
 @testset "BlockIndexer test" begin
@@ -42,7 +43,7 @@ Random.seed!(1)
     @test C isa Matrix{eltype(S)}
 end
 
-@testset "blocksparse test" begin
+@testset "BlockSparseConstructor test" begin
     n,m = 30,25
     nblock,mblock = 3,5
     @test (n,m) .% (nblock,mblock) == (0,0)
@@ -51,20 +52,58 @@ end
     Ablock = Nystrom.BlockIndexer(A,T)
 
     entries = 5
-    I = rand(1:size(Ablock,1),entries)
-    J = rand(1:size(Ablock,2),entries)
-    V = [Ablock[i,j] for (i,j) in zip(I,J)]
-    Asparse = Nystrom.blocksparse(I,J,V,size(Ablock)...)
+    AC = Nystrom.BlockSparseConstructor(T,size(Ablock)...)
+    @test size(AC) == size(Ablock)
+    @test eltype(AC) == eltype(Ablock)
+    prev_entries = []
+    while length(prev_entries) < entries
+        i = rand(1:size(AC,1))
+        j = rand(1:size(AC,2))
+        (i,j) ∈ prev_entries && continue
+        push!(prev_entries, (i,j))
+        v = Ablock[i,j]
+        Nystrom.addentry!(AC,i,j,v)
+    end
+    @test length(AC.I) == length(AC.J) == length(AC.V) == entries*length(T)
+    Asparse = sparse(AC)
     @test Asparse isa SparseMatrixCSC{eltype(A)}
-    @test nnz(Asparse) == entries*length(eltype(Ablock))
+    @test nnz(Asparse) == entries*length(T)
     mask = Asparse.!=0
     @test Asparse[mask] == A[mask]
 
+    AC2 = Nystrom.BlockSparseConstructor(T,size(Ablock)...)
+    I = [i for (i,_) in prev_entries]
+    J = [j for (_,j) in prev_entries]
+    V = [Ablock[i,j] for (i,j) in prev_entries]
+    Nystrom.addentries!(AC2,I,J,V)
+    @test Asparse == sparse(AC2)
+
     # Scalar case
-    I = rand(1:size(A,1),entries)
-    J = rand(1:size(A,2),entries)
-    V = [A[i,j] for (i,j) in zip(I,J)]
-    A1 = Nystrom.blocksparse(I,J,V,size(A)...)
-    A2 = sparse(I,J,V,size(A)...)
-    @test A1 == A2
+    AC = Nystrom.BlockSparseConstructor(eltype(A),size(A)...)
+    @test size(AC) == size(A)
+    @test eltype(AC) == eltype(A)
+    prev_entries = []
+    while length(prev_entries) < entries
+        i = rand(1:size(AC,1))
+        j = rand(1:size(AC,2))
+        (i,j) ∈ prev_entries && continue
+        push!(prev_entries, (i,j))
+        v = A[i,j]
+        Nystrom.addentry!(AC,i,j,v)
+    end
+    @test length(AC.I) == length(AC.J) == length(AC.V) == entries
+    @test prev_entries == collect(zip(AC.I,AC.J))
+    Asparse = sparse(AC)
+    @test Asparse isa SparseMatrixCSC{eltype(A)}
+    @test nnz(Asparse) == entries
+    mask = Asparse.!=0
+    @test Asparse[mask] == A[mask]
+    @test Asparse == sparse(AC.I,AC.J,AC.V,size(A)...)
+
+    AC2 = Nystrom.BlockSparseConstructor(T,size(Ablock)...)
+    I = [i for (i,_) in prev_entries]
+    J = [j for (_,j) in prev_entries]
+    V = [A[i,j] for (i,j) in prev_entries]
+    Nystrom.addentries!(AC2,I,J,V)
+    @test Asparse == sparse(AC2)
 end
