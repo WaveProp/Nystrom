@@ -36,6 +36,7 @@ materialize(d::AbstractDiscreteOp) = abstractmethod(d)
 _materialize(d::AbstractDiscreteOp,x) = materialize(d)*x
 
 _check_dim_mul(A,B) = @assert(size(A,2) == size(B,1))
+_check_dim_mul(A,B::Density{V}) where {V<:SVector} = @assert(size(A,2) == size(B,1)*length(V))
 _check_dim_sum(A,B) = @assert(size(A) == size(B))
 
 ############

@@ -122,10 +122,7 @@ function addentry!(b::BlockSparseConstructor,i::Integer,j::Integer,v::Number)
     push!(b.V, v)
     return nothing
 end
-function addentries!(b::BlockSparseConstructor,
-                     I::AbstractVector{<:Integer},
-                     J::AbstractVector{<:Integer},
-                     V::AbstractVector)
+function addentries!(b::BlockSparseConstructor,I,J,V::AbstractVector)
     @assert length(I) == length(J) == length(V)
     for (i,j,v) in zip(I,J,V)
         addentry!(b,i,j,v)

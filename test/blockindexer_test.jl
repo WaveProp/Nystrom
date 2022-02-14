@@ -3,7 +3,7 @@ using StaticArrays
 using Random
 using Nystrom
 using LinearAlgebra
-using SparseArrays
+using Nystrom.SparseArrays
 Random.seed!(1)
 
 @testset "BlockIndexer test" begin
