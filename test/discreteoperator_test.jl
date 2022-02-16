@@ -60,17 +60,23 @@ Random.seed!(1)
         M = ParametricSurfaces.meshgen(Γ,(2,2))
         mesh = NystromMesh(view(M,Γ),order=1)
 
-        mat = α*A-B+α*B
-        op = α*Aop-Bop+α*Bop
-        Amat = Nystrom.blockmatrix_to_matrix(mat)
+        Amat = Nystrom.blockmatrix_to_matrix(A)
+        Bmat = Nystrom.blockmatrix_to_matrix(B)
+        Amat_op = Nystrom.DiscreteOp(Amat)
+        Bmat_op = Nystrom.DiscreteOp(Bmat)
+
+        mat = α*Amat-Bmat+α*Bmat
+        op = α*Amat_op-Bmat_op+α*Bmat_op
+        @assert Nystrom.materialize(op) ≈ mat
         xvec = reinterpret(eltype(eltype(x)), x)
-        b = reinterpret(eltype(x), Amat\xvec) |> collect
+        b = reinterpret(eltype(x), mat\xvec) |> collect
         σx = Density(x, mesh)
         σb = Density(b, mesh)
 
         ll = Nystrom.DiscreteOpGMRES(op, σx)
         yy = similar(xvec)
         mul!(yy, ll, xvec)
+        @assert yy ≈ mat*xvec
 
         @testset "Vector case" begin
             @test σb == (op\σx)
