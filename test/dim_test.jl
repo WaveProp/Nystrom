@@ -10,7 +10,7 @@ Random.seed!(1)
     rtol=5e-2
     @testset "Greens identity (interior) 2d" begin
         Geometry.clear_entities!()
-        Ω   = ParametricSurfaces.Circle() |> Geometry.Domain
+        Ω   = ParametricSurfaces.Disk() |> Geometry.Domain
         Γ   = boundary(Ω)
         M   = ParametricSurfaces.meshgen(Γ,(5,))
         mesh = NystromMesh(view(M,Γ),order=3)
@@ -112,7 +112,7 @@ Random.seed!(1)
 
     @testset "Greens identity (exterior) 2d" begin
         Geometry.clear_entities!()
-        Ω   = ParametricSurfaces.Circle() |> Geometry.Domain
+        Ω   = ParametricSurfaces.Disk() |> Geometry.Domain
         Γ   = boundary(Ω)
         M   = ParametricSurfaces.meshgen(Γ,(7,))
         mesh = NystromMesh(view(M,Γ),order=3)

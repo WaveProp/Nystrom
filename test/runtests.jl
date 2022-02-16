@@ -1,5 +1,7 @@
 using SafeTestsets
 
+@safetestset "ParametricSurfaces" begin include("ParametricSurfaces/runtests.jl") end
+
 @safetestset "Nystrom mesh" begin include("nystrommesh_test.jl") end
 
 @safetestset "Kernels" begin include("kernels_test.jl") end

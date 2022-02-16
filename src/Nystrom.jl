@@ -10,9 +10,9 @@ using RecipesBase
 using TimerOutputs
 using Base.Threads
 
-# packages to generate the geometry
-using GmshSDK
-using ParametricSurfaces
+# module to handle some simple parametric geometries
+include("ParametricSurfaces/ParametricSurfaces.jl")
+using .ParametricSurfaces
 
 # base utilities
 using WavePropBase

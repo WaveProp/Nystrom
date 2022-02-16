@@ -8,7 +8,7 @@ Random.seed!(1)
     # test the interior representation formula u(r) = 𝒮[γ₁u](r) - 𝒟[γ₀u](r)
     @testset "2d" begin
         Geometry.clear_entities!()
-        Ω    = ParametricSurfaces.Circle() |> Geometry.Domain
+        Ω    = ParametricSurfaces.Disk() |> Geometry.Domain
         Γ    = boundary(Ω)
         M    = ParametricSurfaces.meshgen(Γ,(10,))
         mesh = NystromMesh(view(M,Γ),order=5)
@@ -65,7 +65,7 @@ end
     # test the exterior representation formula -u(r) = 𝒮[γ₁u](r) - 𝒟[γ₀u](r)
     @testset "2d" begin
         Geometry.clear_entities!()
-        Ω  = ParametricSurfaces.Circle() |> Geometry.Domain
+        Ω  = ParametricSurfaces.Disk() |> Geometry.Domain
         Γ    = boundary(Ω)
         M    = ParametricSurfaces.meshgen(Γ,(10,))
         mesh = NystromMesh(view(M,Γ),order=5)
