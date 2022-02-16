@@ -13,7 +13,7 @@ using Nystrom
             gmsh.model.mesh.generate(3)
             Ω = GmshSDK.domain(dim=3)
             M = GmshSDK.meshgen(Ω,dim=3)
-            return Ω,M
+            Ω,M
         end
         ∂Ω = boundary(Ω)
         mesh  = NystromMesh(view(M,∂Ω),order=1)
@@ -37,7 +37,7 @@ using Nystrom
             gmsh.model.mesh.generate(3)
             Ω = GmshSDK.domain(dim=3)
             M = GmshSDK.meshgen(Ω,dim=3)
-            return Ω,M
+            Ω,M
         end
         Γ     = boundary(Ω)
         nmesh = NystromMesh(M,Γ,order=4) # NystromMesh of surface Γ
@@ -66,7 +66,7 @@ using Nystrom
             gmsh.model.mesh.generate(2)
             Ω = GmshSDK.domain(dim=2)
             M = GmshSDK.meshgen(Ω,dim=2)
-            return Ω,M
+            Ω,M
         end
         Γ    = boundary(Ω)
         mesh = NystromMesh(view(M,Ω),order=2)

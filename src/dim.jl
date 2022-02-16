@@ -37,13 +37,7 @@ function single_doublelayer_dim(pde,X,Y=X;compress=Matrix,location=:onsurface)
     end
     # compute corrections
     @timeit_debug "compute dim correction" begin
-        if pde isa Maxwell
-            δS = _singular_weights_dim_maxwell(Sop,γ₀B,γ₁B,R,dict_near)
-            δD = _singular_weights_dim_maxwell(Dop,γ₀B,γ₁B,R,dict_near)
-        else
-            δS = _singular_weights_dim(Sop,γ₀B,γ₁B,R,dict_near)
-            δD = _singular_weights_dim(Dop,γ₀B,γ₁B,R,dict_near)
-        end
+        δS,δD = _singular_weights_dim(Sop,Dop,γ₀B,γ₁B,R,dict_near)
     end
     # convert to DiscreteOp
     S_discrete = DiscreteOp(S) + DiscreteOp(δS)
@@ -67,8 +61,7 @@ function adjointdoublelayer_hypersingular_dim(pde,X,Y=X;compress=Matrix,location
     basis,γ₁_basis = _basis_dim(Kop)
     γ₀B,γ₁B,R      = _auxiliary_quantities_dim(Kop,K,H,basis,γ₁_basis,σ)
     # compute corrections
-    δK        = _singular_weights_dim(Kop,γ₀B,γ₁B,R,dict_near)
-    δH        = _singular_weights_dim(Hop,γ₀B,γ₁B,R,dict_near)
+    δK,δH        = _singular_weights_dim(Kop,Hop,γ₀B,γ₁B,R,dict_near)
     # convert to DiscreteOp
     K_discrete = DiscreteOp(K) + DiscreteOp(δK)
     H_discrete = DiscreteOp(H) + DiscreteOp(δH)
@@ -77,52 +70,35 @@ end
 adjointdoublelayer_dim(args...;kwargs...)  = adjointdoublelayer_hypersingular_dim(args...;kwargs...)[1]
 hypersingular_dim(args...;kwargs...)       = adjointdoublelayer_hypersingular_dim(args...;kwargs...)[2]
 
-
-function singular_weights_dim(iop::IntegralOperator,compress=Matrix)
-    X,Y,op = iop.X, iop.Y, iop.kernel.op
-    σ = X == Y ? -0.5 : 0.0
-    #
-    dict_near = near_interaction_list(dofs(X),Y;atol=0)
-    basis,γ₁_basis = _basis_dim(iop)
-    Op1, Op2       = _auxiliary_operators_dim(iop,compress)
-    γ₀B,γ₁B,R      = _auxiliary_quantities_dim(iop,Op1,Op2,basis,γ₁_basis,σ)
-    Sp = _singular_weights_dim(iop,γ₀B,γ₁B,R,dict_near)
-    return Sp # a sparse matrix
-end
-
 function _auxiliary_quantities_dim(iop,Op0,Op1,basis,γ₁_basis,σ)
-    T      = eltype(iop)
-    X,Y    = target_surface(iop), source_surface(iop)
+    T   = eltype(iop)
+    X,Y = target_surface(iop), source_surface(iop)
     num_basis = length(basis)
     # compute matrix of basis evaluated on Y
-    ynodes   = dofs(Y)
-    γ₀B      = Matrix{T}(undef,length(ynodes),num_basis)
-    γ₁B      = Matrix{T}(undef,length(ynodes),num_basis)
-    for k in 1:num_basis
-        for i in 1:length(ynodes)
-            γ₀B[i,k] = basis[k](ynodes[i])
-            γ₁B[i,k] = γ₁_basis[k](ynodes[i])
+    ynodes = dofs(Y)
+    γ₀B,γ₀B_block = MatrixAndBlockIndexer(T,length(ynodes),num_basis)
+    γ₁B,γ₁B_block = MatrixAndBlockIndexer(T,length(ynodes),num_basis)
+    @threads for i in 1:length(ynodes)
+        for k in 1:num_basis
+            γ₀B_block[i,k] = basis[k](ynodes[i])
+            γ₁B_block[i,k] = γ₁_basis[k](ynodes[i])
         end
     end
     # integrate the basis over Y
     xnodes      = dofs(X)
     num_targets = length(xnodes)
-    num_sources = length(ynodes)
-    R = Matrix{T}(undef,num_targets,num_basis)
+    R,R_block = MatrixAndBlockIndexer(T,num_targets,num_basis)
     @timeit_debug "integrate dim basis" begin
+        # R .= Op0*γ₁B - Op1*γ₀B
+        mul!(R,Op0,γ₁B)
+        mul!(R,Op1,γ₀B,-1,1)
         @threads for k in 1:num_basis
-            # integrate basis over the surface
-            # FIXME: use inplace multiplication through `mul!` instead of the line
-            # below. The issue at the moment is that
-            R[:,k] = Op0*γ₁B[:,k] - Op1*γ₀B[:,k]
-            # @views mul!(R[:,k],Op0,γ₁B[:,k])
-            # @views mul!(R[:,k:k],Op1,γ₀B[:,k:k],-1,1)
             for i in 1:num_targets
                 # analytic correction for on-surface evaluation of Greens identity
                 if kernel_type(iop) isa Union{SingleLayer,DoubleLayer}
-                    R[i,k] += σ*basis[k](xnodes[i])
+                    R_block[i,k] += σ*basis[k](xnodes[i])
                 elseif kernel_type(iop) isa Union{AdjointDoubleLayer,HyperSingular}
-                    R[i,k] += σ*γ₁_basis[k](xnodes[i])
+                    R_block[i,k] += σ*γ₁_basis[k](xnodes[i])
                 end
             end
         end
@@ -152,109 +128,106 @@ function _basis_dim(iop)
     return basis,γ₁_basis
 end
 
-function _singular_weights_dim(iop::IntegralOperator,γ₀B,γ₁B,R,dict_near)
-    X,Y = target_surface(iop), source_surface(iop)
-    T   = eltype(iop)
-    num_basis = size(γ₀B,2)
-    a,b = combined_field_coefficients(iop)
-    # we now have the residue R. For the correction we need the coefficients.
-    Is = Int[]
-    Js = Int[]
-    Vs = T[]
-    for (E,list_near) in dict_near
-        el2qnodes = elt2dof(Y,E)
-        num_qnodes, num_els   = size(el2qnodes)
-        M                     = Matrix{T}(undef,2*num_qnodes,num_basis)
-        @assert length(list_near) == num_els
-        for n in 1:num_els
-            j_glob                = @view el2qnodes[:,n]
-            M[1:num_qnodes,:]     = @view γ₀B[j_glob,:]
-            M[num_qnodes+1:end,:] = @view γ₁B[j_glob,:]
-            # distinguish scalar and vectorial case
-            if T <: Number
-                F                     = qr(M)
-            elseif T <: SMatrix
-                M_mat = blockmatrix_to_matrix(M)
-                F                     = qr!(M_mat)
-            else
-                error("unknown element type T=$T")
-            end
-            for (i,_) in list_near[n]
-                if T <: Number
-                    tmp = ((R[i:i,:])/F.R)*adjoint(F.Q)
-                elseif T <: SMatrix
-                    tmp_scalar  = (blockmatrix_to_matrix(R[i:i,:])/F.R)*adjoint(F.Q)
-                    tmp  = matrix_to_blockmatrix(tmp_scalar,T)
-                else
-                    error("unknown element type T=$T")
-                end
-                w    = axpby!(a,view(tmp,1:num_qnodes),b,view(tmp,(num_qnodes+1):(2*num_qnodes)))
-                append!(Is,fill(i,num_qnodes))
-                append!(Js,j_glob)
-                append!(Vs,w)
-            end
-        end
-    end
-    Sp = sparse(Is,Js,Vs,size(iop)...)
-    return Sp
-end
-
-function _singular_weights_dim_maxwell(iop::IntegralOperator,γ₀B,γ₁B,R,dict_near)
+function _singular_weights_dim(op1::IntegralOperator,op2::IntegralOperator,γ₀B,γ₁B,R,dict_near)
     # initialize vectors for the sparse matrix, then dispatch to type-stable
     # method for each element type
-    T   = eltype(iop)
-    Is = Int[]
-    Js = Int[]
-    Vs = T[]
+    @assert (kernel(op1) isa SingleLayerKernel && kernel(op2) isa DoubleLayerKernel) ||
+            (kernel(op1) isa AdjointDoubleLayerKernel && kernel(op2) isa HyperSingularKernel)
+    Y  = source_surface(op1)
+    T  = eltype(op1)
+    sizeop = size(op1)
+    # for single layer / adjoint double layer
+    δSblock = BlockSparseConstructor(T,sizeop...) 
+    _,Scoeff = combined_field_coefficients(op1)
+    # for double layer / hypersingular
+    δDblock = BlockSparseConstructor(T,sizeop...) 
+    Dcoeff,_ = combined_field_coefficients(op2)
     for (E,list_near) in dict_near
-        _singular_weights_dim_maxwell!(Is,Js,Vs,iop,γ₀B,γ₁B,R,E,list_near)
+        if pde(kernel(op1)) isa Maxwell
+            _singular_weights_dim_maxwell!(δSblock,δDblock,Scoeff,Dcoeff,Y,γ₀B,γ₁B,R,E,list_near)
+        else
+            _singular_weights_dim!(δSblock,δDblock,Scoeff,Dcoeff,Y,γ₀B,γ₁B,R,E,list_near)
+        end
     end
-    Sp = sparse(Is,Js,Vs,size(iop)...)
-    return Sp
+    # convert to SparseMatrixCSC{<:Number}
+    δS = sparse(δSblock)
+    δD = sparse(δDblock)
+    return δS, δD
 end
 
-@noinline function _singular_weights_dim_maxwell!(Is,Js,Vs,iop,γ₀B,γ₁B,R,E,list_near)
-    X,Y    = target_surface(iop), source_surface(iop)
-    qnodes = dofs(Y)
-    T   = eltype(iop)
-    a,b = combined_field_coefficients(iop)
+@noinline function _singular_weights_dim!(δSblock,δDblock,Scoeff,Dcoeff,Y,γ₀B,γ₁B,R,E,list_near)
+    T = eltype(δSblock)  # block type
     el2qnodes = elt2dof(Y,E)
-    num_qnodes, num_els   = size(el2qnodes)
-    num_basis = size(γ₀B,2)
-    T2 = SMatrix{2,3,ComplexF64,6}
-    T3 = SMatrix{3,2,ComplexF64,6}
-    M      = Matrix{T2}(undef,2*num_qnodes,num_basis)
-    M_mat  = Matrix{ComplexF64}(undef,2*2*num_qnodes,3*num_basis)
+    num_qnodes, num_els = size(el2qnodes)
+    γ₀B_block = BlockIndexer(γ₀B,T)
+    γ₁B_block = BlockIndexer(γ₁B,T)
+    R_block   = BlockIndexer(R,T)
+    num_basis = size(γ₀B_block,2)
+    M,Mblock  = MatrixAndBlockIndexer(T,2*num_qnodes,num_basis)
+    H,Hblock  = MatrixAndBlockIndexer(T,1,num_basis)
+    G,Gblock  = MatrixAndBlockIndexer(T,1,2*num_qnodes)
     @assert length(list_near) == num_els
     for n in 1:num_els
-        j_glob                = @view el2qnodes[:,n]
-        for p in 1:num_basis
-            for k in 1:num_qnodes
-                # J,_ = jacobian(qnodes[j_glob[k]]) |> qr
-                J = jacobian(qnodes[j_glob[k]])
-                M[k,p]            = transpose(J)*γ₀B[j_glob[k],p]
-                M[num_qnodes+k,p] = transpose(J)*γ₁B[j_glob[k],p]
-            end
-        end
-        # M_mat                 = blockmatrix_to_matrix(M)
-        blockmatrix_to_matrix!(M_mat,M)
-        F                     = qr!(M_mat)
+        j_glob                     = @view el2qnodes[:,n]
+        Mblock[1:num_qnodes,:]     = @view γ₀B_block[j_glob,:]
+        Mblock[num_qnodes+1:end,:] = @view γ₁B_block[j_glob,:]
+        F = qr!(M)
         for (i,_) in list_near[n]
-            tmp_scalar  = (blockmatrix_to_matrix(R[i:i,:])/F.R)*adjoint(F.Q)
-            tmp         = matrix_to_blockmatrix(tmp_scalar,T3)
-            tmp         = axpby!(a,view(tmp,1:num_qnodes),b,view(tmp,(num_qnodes+1):(2*num_qnodes)))
-            w           = Vector{T}(undef,num_qnodes)
-            for k in 1:num_qnodes
-                # J,_ = jacobian(qnodes[j_glob[k]]) |> qr
-                J    = jacobian(qnodes[j_glob[k]])
-                w[k] = tmp[k]*transpose(J)
-            end
-            append!(Is,fill(i,num_qnodes))
-            append!(Js,j_glob)
-            append!(Vs,w)
+            Hblock[:,:] = @view R_block[i:i,:]
+            G[:,:] = (H/F.R)*adjoint(F.Q)
+            # add entries to BlockSparseConstructor
+            Is = fill(i,num_qnodes)
+            Js = j_glob
+            Ss = Scoeff * view(Gblock,(num_qnodes+1):(2*num_qnodes))
+            Ds = Dcoeff * view(Gblock,1:num_qnodes)
+            addentries!(δSblock,Is,Js,Ss)
+            addentries!(δDblock,Is,Js,Ds)
         end
     end
-    return Is,Js,Vs
+end
+
+@noinline function _singular_weights_dim_maxwell!(δSblock,δDblock,Scoeff,Dcoeff,Y,γ₀B,γ₁B,R,E,list_near)
+    qnodes = dofs(Y)
+    T = eltype(δSblock)  # block type
+    T2 = SMatrix{2,3,ComplexF64,6}
+    T3 = SMatrix{3,2,ComplexF64,6}
+    el2qnodes = elt2dof(Y,E)
+    num_qnodes, num_els = size(el2qnodes)
+    γ₀B_block = BlockIndexer(γ₀B,T)
+    γ₁B_block = BlockIndexer(γ₁B,T)
+    R_block   = BlockIndexer(R,T)
+    num_basis = size(γ₀B_block,2)
+    M,Mblock  = MatrixAndBlockIndexer(T2,2*num_qnodes,num_basis)
+    H,Hblock  = MatrixAndBlockIndexer(T,1,num_basis)
+    G,Gblock  = MatrixAndBlockIndexer(T3,1,2*num_qnodes)
+    Ss = Vector{T}(undef,num_qnodes)  # for single layer (EFIE)
+    Ds = Vector{T}(undef,num_qnodes)  # for double layer (MFIE)
+    @assert length(list_near) == num_els
+    for n in 1:num_els
+        j_glob = @view el2qnodes[:,n]
+        for p in 1:num_basis
+            for k in 1:num_qnodes
+                J = jacobian(qnodes[j_glob[k]])
+                Mblock[k,p]            = transpose(J)*γ₀B_block[j_glob[k],p]
+                Mblock[num_qnodes+k,p] = transpose(J)*γ₁B_block[j_glob[k],p]
+            end
+        end
+        F = qr!(M)
+        for (i,_) in list_near[n]
+            Hblock[:,:] = @view R_block[i:i,:]
+            G[:,:] = (H/F.R)*adjoint(F.Q)
+            for k in 1:num_qnodes
+                J     = jacobian(qnodes[j_glob[k]])
+                Ds[k] = Dcoeff*Gblock[k]*transpose(J)
+                Ss[k] = Scoeff*Gblock[k+num_qnodes]*transpose(J)
+            end
+            # add entries to BlockSparseConstructor
+            Is = fill(i,num_qnodes)
+            Js = j_glob
+            addentries!(δSblock,Is,Js,Ss)
+            addentries!(δDblock,Is,Js,Ds)
+        end
+    end
 end
 
 function _source_gen(iop::IntegralOperator,kfactor=5)

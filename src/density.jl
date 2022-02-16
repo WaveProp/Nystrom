@@ -39,48 +39,40 @@ Base.:+(σ::Density) = σ
 Base.:*(a::Number,σ::Density) = Density(a*σ.vals,σ.mesh)
 Base.:*(σ::Density,a::Number) = a*σ
 Base.:/(σ::Density,a::Number) = Density(σ.vals/a,σ.mesh)
-Base.:*(A::Matrix,σ::Density) = Density(A*σ.vals,σ.mesh)
-Base.:*(A::Diagonal,σ::Density) = Density(A*σ.vals,σ.mesh)
 
-function Base.:\(A::AbstractMatrix{T},σ::Density{V}) where {T,V}
-    @assert size(A,1) == size(A,2)
-    if T <: Number && V <: Number
-        y = A\σ.vals
-        return Density(y,σ.mesh)
-    elseif T <: SMatrix && V <: SVector
-        Amat    = blockmatrix_to_matrix(A)
-        σ_vec   = reinterpret(eltype(V),σ.vals)
-        vals_vec = Amat\σ_vec
-        vals    = reinterpret(V,vals_vec) |> collect
-        return Density(vals,σ.mesh)
-    else
-        notimplemented()
-    end
+Base.:*(A::AbstractMatrix{<:Number},σ::Density{<:Number}) = Density(A*σ.vals,σ.mesh)
+function Base.:*(A::AbstractMatrix{<:Number},σ::Density{V}) where {V<:SVector}
+    σvec = reinterpret(eltype(V),σ.vals)
+    μlen,res = divrem(size(A,1),length(V))
+    @assert res == 0
+    μ = Density(zeros(V,μlen),σ.mesh)
+    μvec = reinterpret(eltype(V),μ.vals)
+    mul!(μvec,A,σvec)
+    return μ
 end
 
-function IterativeSolvers.gmres!(σ::Density{V},A::AbstractMatrix{T},μ::Density{V},args...;kwargs...) where {T,V}
+Base.:\(A::AbstractMatrix{<:Number},σ::Density{<:Number}) = Density(A\σ.vals,σ.mesh)
+function Base.:\(A::AbstractMatrix{<:Number},σ::Density{V}) where {V<:SVector}
+    @assert size(A,1) == size(A,2)
+    σvec = reinterpret(eltype(V),σ.vals)
+    μlen,res = divrem(size(A,1),length(V))
+    @assert res == 0
+    μ = Density(zeros(V,μlen),σ.mesh)
+    μvec = reinterpret(eltype(V),μ.vals)
+    μvec[:] = A\σvec
+    return μ
+end
+
+function IterativeSolvers.gmres!(σ::Density{V},A::AbstractMatrix{<:Number},μ::Density{V},args...;kwargs...) where V
     log = haskey(kwargs,:log) ? kwargs[:log] : false
-    if T <: Number && V <: Number
-        if log
-            vals,hist = gmres!(σ.vals,A,μ.vals,args...;kwargs...)
-            return σ,hist
-        else
-            vals = gmres!(σ.vals,A,μ.vals,args...;kwargs...)
-            return σ
-        end
-    elseif T <: SMatrix && V <: SVector
-        Amat    = blockmatrix_to_matrix(A)
-        σ_vec   = reinterpret(eltype(V),σ.vals)
-        μ_vec   = reinterpret(eltype(V),μ.vals)
-        if log
-            vals,hist = gmres!(σ_vec,Amat,μ_vec,args...;kwargs...)
-            return σ,hist
-        else
-            vals = gmres!(σ_vec,Amat,μ_vec,args...;kwargs...)
-            return σ
-        end
+    σvec = reinterpret(eltype(V),σ.vals)
+    μvec = reinterpret(eltype(V),μ.vals)
+    if log
+        vals,hist = gmres!(σvec,A,μvec,args...;kwargs...)
+        return σ,hist
     else
-        notimplemented()
+        vals = gmres!(σvec,A,μvec,args...;kwargs...)
+        return σ
     end
 end
 IterativeSolvers.gmres(A,μ::Density,args...;kwargs...) = gmres!(zero(μ),A,μ,args...;kwargs...)

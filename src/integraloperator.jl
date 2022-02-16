@@ -10,6 +10,19 @@ struct IntegralOperator{T,K,S,V} <: AbstractMatrix{T}
     source_surface::V
 end
 
+function Base.Matrix(iop::IntegralOperator{T}) where {T<:SMatrix}
+    # convert the `IntegralOperator` (matrix of SMatrix)
+    # into a plain matrix (matrix of scalars)
+    N,M = size(iop)
+    A,Ablock = MatrixAndBlockIndexer(T,N,M)
+    @threads for i in 1:N
+        for j in 1:M 
+            Ablock[i,j] = iop[i,j]
+        end
+    end
+    return A
+end
+
 kernel(iop::IntegralOperator) = iop.kernel
 target_surface(iop::IntegralOperator) = iop.target_surface
 source_surface(iop::IntegralOperator) = iop.source_surface
