@@ -28,7 +28,7 @@ function single_doublelayer_dim(pde,X,Y=X;compress=Matrix,location=:onsurface)
         D = compress(Dop)
     end
     @timeit_debug "compute near interaction list" begin
-        dict_near = near_interaction_list(dofs(X),Y;atol=0)
+        dict_near = _near_interaction_list_dim(X,Y)
     end
     # precompute dim quantities
     @timeit_debug "auxiliary dim quantities" begin
@@ -56,7 +56,7 @@ function adjointdoublelayer_hypersingular_dim(pde,X,Y=X;compress=Matrix,location
     # convert to a possibly more efficient compress
     K = compress(Kop)
     H = compress(Hop)
-    dict_near = near_interaction_list(dofs(X),Y;atol=0)
+    dict_near = _near_interaction_list_dim(X,Y)
     # precompute dim quantities
     basis,γ₁_basis = _basis_dim(Kop)
     γ₀B,γ₁B,R      = _auxiliary_quantities_dim(Kop,K,H,basis,γ₁_basis,σ)
@@ -120,6 +120,40 @@ function _auxiliary_operators_dim(iop,compress)
     return Op1,Op2
 end
 
+"""
+    _near_interaction_list_dim(iop,location)
+
+For each element `el` in the `source_surface` of `iop`, return the indices of
+the nodes in the `target_surface` for which `el` is the closest element. This
+map gives the indices in `iop` that need to be corrected by the `dim`
+quadrature when integrating over `el`.
+"""
+function _near_interaction_list_dim(X,Y)
+    dict = Dict{DataType,Vector{Vector{Int}}}()
+    if X === Y
+        # when both surfaces are the same, the "near points" of an element are
+        # simply its own quadrature points
+        for (E,dofs) in elt2dof(Y)
+            dict[E] = map(i->collect(i),eachcol(dofs))
+        end
+    else
+        notimplemented()
+        # FIXME: this case is a lot less common, but deserves some attention.
+        # The idea is that we should find, for each target point, the closest
+        # that is less than a tolerance `atol` (there may be none). We then
+        # revert this map to build a map where for each element in `Y`, we store
+        # a vector of the target indices for which that element is the closest
+        # since this is what is needed by the `dim` methods as implemented here.
+        target2source = nearest_neighbor(dofs(X),dofs(Y))
+        source2el = dof2el(Y)
+        for (i,s) in enumerate(target2source)
+            E,n = source2el[s]
+            push!(dict[E][n],i)
+        end
+    end
+    return dict
+end
+
 function _basis_dim(iop)
     op = pde(kernel(iop))
     xs = _source_gen(iop) # list of Lebedev sources
@@ -137,10 +171,10 @@ function _singular_weights_dim(op1::IntegralOperator,op2::IntegralOperator,γ₀
     T  = eltype(op1)
     sizeop = size(op1)
     # for single layer / adjoint double layer
-    δSblock = BlockSparseConstructor(T,sizeop...) 
+    δSblock = BlockSparseConstructor(T,sizeop...)
     _,Scoeff = combined_field_coefficients(op1)
     # for double layer / hypersingular
-    δDblock = BlockSparseConstructor(T,sizeop...) 
+    δDblock = BlockSparseConstructor(T,sizeop...)
     Dcoeff,_ = combined_field_coefficients(op2)
     for (E,list_near) in dict_near
         if pde(kernel(op1)) isa Maxwell
@@ -168,11 +202,14 @@ end
     G,Gblock  = MatrixAndBlockIndexer(T,1,2*num_qnodes)
     @assert length(list_near) == num_els
     for n in 1:num_els
+        # if there is nothing near, skip immediately to next element
+        isempty(list_near[n]) && continue
+        # there are entries to correct, so do some work
         j_glob                     = @view el2qnodes[:,n]
         Mblock[1:num_qnodes,:]     = @view γ₀B_block[j_glob,:]
         Mblock[num_qnodes+1:end,:] = @view γ₁B_block[j_glob,:]
         F = qr!(M)
-        for (i,_) in list_near[n]
+        for i in list_near[n]
             Hblock[:,:] = @view R_block[i:i,:]
             G[:,:] = (H/F.R)*adjoint(F.Q)
             # add entries to BlockSparseConstructor
@@ -213,7 +250,7 @@ end
             end
         end
         F = qr!(M)
-        for (i,_) in list_near[n]
+        for i in list_near[n]
             Hblock[:,:] = @view R_block[i:i,:]
             G[:,:] = (H/F.R)*adjoint(F.Q)
             for k in 1:num_qnodes
