@@ -19,7 +19,7 @@ end
 function single_doublelayer_dim(pde,X,Y=X;compress=Matrix,location=:onsurface)
     msg = "unrecognized value for kw `location`: received $location.
            Valid options are `:onsurface`, `:inside` and `:outside`."
-    σ = location === :onsurface ? -0.5 : location === :inside ? 0 : location === :outside ? -1 : error(msg)
+    σ = location === :onsurface ? -0.5 : location === :inside ? -1 : location === :outside ? 0 : error(msg)
     Sop  = SingleLayerOperator(pde,X,Y)
     Dop  = DoubleLayerOperator(pde,X,Y)
     # convert to a possibly more efficient format
@@ -50,7 +50,7 @@ doublelayer_dim(args...;kwargs...) = single_doublelayer_dim(args...;kwargs...)[2
 function adjointdoublelayer_hypersingular_dim(pde,X,Y=X;compress=Matrix,location=:onsurface)
     msg = "unrecognized value for kw `location`: received $location.
     Valid options are `:onsurface`, `:inside` and `:outside`."
-    σ = location === :onsurface ? -0.5 : location === :inside ? 0 : location === :outside ? -1 : error(msg)
+    σ = location === :onsurface ? -0.5 : location === :inside ? -1 : location === :outside ? 0 : error(msg)
     Kop  = AdjointDoubleLayerOperator(pde,X,Y)
     Hop  = HyperSingularOperator(pde,X,Y)
     # convert to a possibly more efficient compress
@@ -129,29 +129,58 @@ map gives the indices in `iop` that need to be corrected by the `dim`
 quadrature when integrating over `el`.
 """
 function _near_interaction_list_dim(X,Y)
-    dict = Dict{DataType,Vector{Vector{Int}}}()
     if X === Y
+        dict = Dict{DataType,Vector{Vector{Int}}}()
         # when both surfaces are the same, the "near points" of an element are
         # simply its own quadrature points
-        for (E,dofs) in elt2dof(Y)
-            dict[E] = map(i->collect(i),eachcol(dofs))
+        for (E,idx_dofs) in elt2dof(Y)
+            dict[E] = map(i->collect(i),eachcol(idx_dofs))
         end
     else
-        notimplemented()
         # FIXME: this case is a lot less common, but deserves some attention.
         # The idea is that we should find, for each target point, the closest
         # that is less than a tolerance `atol` (there may be none). We then
         # revert this map to build a map where for each element in `Y`, we store
         # a vector of the target indices for which that element is the closest
         # since this is what is needed by the `dim` methods as implemented here.
-        target2source = nearest_neighbor(dofs(X),dofs(Y))
-        source2el = dof2el(Y)
+        dict = Dict{DataType,Vector{Vector{Int}}}()
+        hmax = -Inf # minimum average distance between quadrature nodes
+        for (E,idx_dofs) in elt2dof(Y)
+            nq,ne   = size(idx_dofs)
+            for idxs in eachcol(idx_dofs)
+                h = sum(i->weight(Y.dofs[i]),idxs) / length(idxs)
+                hmax = max(h,hmax)
+            end
+            dict[E] = [Int[] for _ in 1:ne]
+        end
+        target2source = nearest_neighbor(dofs(X),dofs(Y),10*hmax)
+        source2el     = dof2el(Y)
         for (i,s) in enumerate(target2source)
+            s == -1 && continue
             E,n = source2el[s]
             push!(dict[E][n],i)
         end
     end
     return dict
+end
+
+function nearest_neighbor(X,Y,dmax=Inf)
+    m,n = length(X), length(Y)
+    out = Vector{Int}(undef,m)
+    for i in 1:m
+        dist = Inf
+        jmin   = -1
+        for j in 1:n
+            d = norm(coords(X[i])-coords(Y[j]))
+            d > dmax && continue
+            if d < dist
+                dist = d
+                jmin = j
+            end
+        end
+        out[i] = jmin
+    end
+    return out
 end
 
 function _basis_dim(iop)
