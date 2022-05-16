@@ -23,31 +23,43 @@ diagonal_ncross_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[1]
 diagonal_jacobian_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[2]
 diagonal_dualjacobian_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[3]
 
-function blockdiag_preconditioner(dop::Nystrom.LinearCombinationDiscreteOp)
-    # FIXME: too hacky
-    # dop.maps[1]: uncorrected integral operator
-    # dop.maps[2]: sparse correction
-    @assert length(dop.maps) == 2
-    C₀ = Nystrom.materialize(dop.maps[1])  # uncorrected integral operator
-    C₁ = Nystrom.materialize(dop.maps[2])  # sparse correction
-    # TODO: handle the case when C₀ is not a matrix
-    @assert C₀ isa Matrix{<:Number}
-    @assert C₁ isa SparseMatrixCSC{<:Number}
+"""
+    blockdiag(d::Nystrom.LinearCombinationDiscreteOp;
+              iop::Union{Nothing,MaxwellOperator}=nothing)
 
+Returns the block-diagonal (as a `SparseMatrixCSC{<:Number}`) of
+an integral operator `d` obtained with `maxwell_dim`. 
+The respective `iop:MaxwellOperator` (`EFIEOperator` or `MFIEOperator`)
+is required only if `maxwell_dim` was called with a `compress` argument 
+(e.g. with `compress = ifgf_compressor(;order=(3,3,3))`).
+"""
+function blockdiag(d::Nystrom.LinearCombinationDiscreteOp;
+                   iop::Union{Nothing,MaxwellOperator}=nothing)
+    # Check that `d` has the following form:
+    # d.maps[1]: uncorrected integral operator
+    # d.maps[2]: sparse correction
+    @assert length(d.maps) == 2
+    C₀ = Nystrom.materialize(d.maps[1])  # uncorrected integral operator
+    C₁ = Nystrom.materialize(d.maps[2])  # sparse correction
+    @assert C₁ isa SparseMatrixCSC{<:Number}
+    bd = _blockdiag(C₀,C₁;iop)
+    return bd
+end
+function _blockdiag(C₀::Matrix{<:Number},C₁;iop)
     # the sparse correction needs to be corrected
-    # with the integral operator
-    blockdiag = deepcopy(C₁)    # block diagonal preconditioner
-    rows = rowvals(blockdiag)
-    vals = nonzeros(blockdiag)
-    ncols = size(blockdiag,2)   # number of columns
+    # with the uncorrected integral operator `C₀`
+    bd = deepcopy(C₁)    # block diagonal preconditioner
+    rows = rowvals(bd)
+    vals = nonzeros(bd)
+    ncols = size(bd,2)   # number of columns
     Threads.@threads for j in 1:ncols
-        for index in nzrange(blockdiag, j)
+        for index in nzrange(bd, j)
             i = rows[index]  # row index
             # update value in blockdiag
             vals[index] += C₀[i,j]
         end
     end
-    return blockdiag
+    return bd
 end
 
 ###
