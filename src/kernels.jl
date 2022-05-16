@@ -1,6 +1,6 @@
 abstract type AbstractPDE{N} end
 
-Geometry.ambient_dimension(pde::AbstractPDE{N}) where {N} = N
+Geometry.ambient_dimension(::AbstractPDE{N}) where {N} = N
 
 """
     abstract type AbstractKernel{T}
@@ -12,16 +12,7 @@ A kernel functions `K` with the signature `K(target,source)::T`.
 abstract type AbstractKernel{T} end
 
 return_type(::AbstractKernel{T}) where {T} = T
-
 ambient_dimension(K::AbstractKernel) = ambient_dimension(pde(K))
-
-"""
-    pde(K::AbstractKernel)
-
-Return the underlying `AbstractPDE` when `K` correspond to the kernel of an
-integral operator derived from a partial differential equation.
-"""
-pde(k::AbstractKernel) = k.pde
 
 """
     struct GenericKernel{T,F} <: AbstractKernel{T}
@@ -33,33 +24,47 @@ struct GenericKernel{T,F} <: AbstractKernel{T}
 end
 
 """
-    struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
+    abstract type AbstractPDEKernel{T,Op} <: AbstractKernel{T}
+
+An [`AbstractKernel`](@ref) with an associated `pde::Op`.
+"""
+abstract type AbstractPDEKernel{T,Op} <: AbstractKernel{T} end
+
+"""
+    pde(K::AbstractPDEKernel)
+
+Return the underlying `AbstractPDE` when `K` correspond to the kernel of an
+integral operator derived from a partial differential equation.
+"""
+pde(k::AbstractPDEKernel) = k.pde
+
+# convenient constructor
+(K::Type{<:AbstractPDEKernel})(op) = K{default_kernel_eltype(op),typeof(op)}(op)
+
+"""
+    struct SingleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
 
 Given an operator `Op::Abstract`, construct its free-space single-layer kernel (i.e. the
 fundamental solution).
 """
-struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
+struct SingleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
     pde::Op
 end
-SingleLayerKernel{T}(op) where {T} = SingleLayerKernel{T,typeof(op)}(op)
-SingleLayerKernel(op)              = SingleLayerKernel{default_kernel_eltype(op)}(op)
 
 """
-    struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
+    struct DoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
 
 Given an operator `Op`, construct its free-space double-layer kernel. This
 corresponds to the `γ₁` trace of the [`SingleLayerKernel`](@ref). For operators
 such as [`Laplace`](@ref) or [`Helmholtz`](@ref), this is simply the normal
 derivative of the fundamental solution respect to the source variable.
 """
-struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
+struct DoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
     pde::Op
 end
-DoubleLayerKernel{T}(op) where {T}     = DoubleLayerKernel{T,typeof(op)}(op)
-DoubleLayerKernel(op)                  = DoubleLayerKernel{default_kernel_eltype(op)}(op)
 
 """
-    struct AdjointDoubleLayerKernel{T,Op} <: AbstractKernel{T}
+    struct AdjointDoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
 
 Given an operator `Op`, construct its free-space adjoint double-layer kernel. This
 corresponds to the `transpose(γ₁,ₓ[G])`, where `G` is the
@@ -67,14 +72,12 @@ corresponds to the `transpose(γ₁,ₓ[G])`, where `G` is the
 [`Helmholtz`](@ref), this is simply the normal derivative of the fundamental
 solution respect to the target variable.
 """
-struct AdjointDoubleLayerKernel{T,Op} <: AbstractKernel{T}
+struct AdjointDoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
     pde::Op
 end
-AdjointDoubleLayerKernel{T}(op) where {T} = AdjointDoubleLayerKernel{T,typeof(op)}(op)
-AdjointDoubleLayerKernel(op)              = AdjointDoubleLayerKernel{default_kernel_eltype(op)}(op)
 
 """
-    struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
+    struct HyperSingularKernel{T,Op} <: AbstractPDEKernel{T,Op}
 
 Given an operator `Op`, construct its free-space hypersingular kernel. This
 corresponds to the `transpose(γ₁,ₓγ₁[G])`, where `G` is the
@@ -82,11 +85,9 @@ corresponds to the `transpose(γ₁,ₓγ₁[G])`, where `G` is the
 [`Helmholtz`](@ref), this is simply the normal derivative of the fundamental
 solution respect to the target variable of the `DoubleLayerKernel`.
 """
-struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
+struct HyperSingularKernel{T,Op} <: AbstractPDEKernel{T,Op}
     pde::Op
 end
-HyperSingularKernel{T}(op) where {T} = HyperSingularKernel{T,typeof(op)}(op)
-HyperSingularKernel(op)              = HyperSingularKernel{default_kernel_eltype(op)}(op)
 
 # a trait for the kernel type
 struct SingleLayer end
