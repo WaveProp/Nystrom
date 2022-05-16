@@ -27,21 +27,23 @@ Random.seed!(1)
     T    = ComplexF64
     B    = rand(T,npts)
 
-    # TODO: adapt IFGF to more operators
-    for op in (SingleLayerOperator,)
-        iop = op(pde,nmesh)
-        K = Nystrom.kernel(iop)
-        compress = ifgf_compressor(;order)
-        L = compress(iop)
+    @testset "IFGF operators" begin
+        # TODO: adapt IFGF to more operators
+        for op in (SingleLayerOperator,)
+            iop = op(pde,nmesh)
+            K = Nystrom.kernel(iop)
+            compress = ifgf_compressor(;order)
+            L = compress(iop)
 
-        J  = rand(1:npts,nsample)
-        B  = randn(T,npts)
-        yw = Nystrom.qweights(nmesh) |> collect
-        exa = [sum(K(Xpts[i],Ypts[j])*yw[j]*B[j] for j in 1:npts) for i in J]
+            J  = rand(1:npts,nsample)
+            B  = randn(T,npts)
+            yw = Nystrom.qweights(nmesh) |> collect
+            exa = [sum(K(Xpts[i],Ypts[j])*yw[j]*B[j] for j in 1:npts) for i in J]
 
-        y = similar(B)
-        mul!(y,L,B)
-        er = norm(y[J]-exa) / norm(exa) # relative error
-        @test er < 1e-6
+            y = similar(B)
+            mul!(y,L,B)
+            er = norm(y[J]-exa) / norm(exa) # relative error
+            @test er < 1e-6
+        end
     end
 end
