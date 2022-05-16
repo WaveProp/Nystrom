@@ -1,10 +1,27 @@
+"""
+    dual_jacobian(jac::SMatrix{3,2,Float64,6})
+
+Returns the dual jacobian `djac` of `jac`. `jac` must have full rank.
+Basically `djac = pinv(jac)`, but without bugs (refer to https://github.com/JuliaLang/julia/issues/44234).
+"""
+@fastmath function dual_jacobian(jac::SMatrix{3,2,Float64,6})
+    t1 = jac[:,1]
+    t2 = jac[:,2]
+    n = cross(t1, t2)
+    V = n[1]^2+n[2]^2+n[3]^2
+    e1 = transpose(cross(t2, n))
+    e2 = transpose(cross(n, t1))
+    djac = vcat(e1, e2) / V
+    return djac
+end
+
 function diagonal_ncross_and_jacobian_matrices(nmesh)
     qnodes = Nystrom.dofs(nmesh)
     n_qnodes = length(qnodes)
     # construct diagonal matrices as sparse arrays using BlockSparseConstructor
     Tn = qnodes |> first |> Nystrom.normal |> Nystrom.cross_product_matrix |> typeof
     Tj = qnodes |> first |> Nystrom.jacobian |> typeof
-    Td = SMatrix{2,3,Float64,6}  # TODO: remove harcoded type
+    Td = qnodes |> first |> Nystrom.jacobian |> dual_jacobian |> typeof
     nblock = Nystrom.BlockSparseConstructor(Tn,n_qnodes,n_qnodes)
     jblock = Nystrom.BlockSparseConstructor(Tj,n_qnodes,n_qnodes)
     dblock = Nystrom.BlockSparseConstructor(Td,n_qnodes,n_qnodes)
@@ -12,7 +29,7 @@ function diagonal_ncross_and_jacobian_matrices(nmesh)
         q = qnodes[i]
         n = Nystrom.cross_product_matrix(normal(q))
         j = Nystrom.jacobian(q)
-        d = Td(pinv(j))
+        d = dual_jacobian(j)
         Nystrom.addentry!(nblock,i,i,n)
         Nystrom.addentry!(jblock,i,i,j)
         Nystrom.addentry!(dblock,i,i,d)

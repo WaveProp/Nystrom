@@ -16,6 +16,15 @@ using Nystrom.MaxwellDIM
     k = 1
     pde = Maxwell(;k)
 
+    @testset "Dual jacobian" begin
+        T1 = SMatrix{3,2,Float64,6}
+        T2 = SMatrix{2,3,Float64,6}
+        J  = rand(T1)
+        dualJ = MaxwellDIM.dual_jacobian(J)
+        @test dualJ isa T2
+        @test norm(dualJ*J-I,Inf) < 1e-15
+    end
+
     @testset "Block diagonal preconditioner" begin
         _,K = MaxwellDIM.maxwell_dim(pde,nmesh)  # MFIE
         Kmat = Nystrom.materialize(K)
