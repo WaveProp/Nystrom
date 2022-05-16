@@ -43,7 +43,7 @@ Base.:/(σ::Density,a::Number) = Density(σ.vals/a,σ.mesh)
 Base.:*(A::AbstractMatrix{<:Number},σ::Density{<:Number}) = Density(A*σ.vals,σ.mesh)
 function Base.:*(A::AbstractMatrix{<:Number},σ::Density{V}) where {V<:SVector}
     σvec = reinterpret(eltype(V),σ.vals)
-    μlen,res = divrem(size(A,1),length(V))
+    μlen,res = divrem(size(A,2),length(V))
     @assert res == 0
     μ = Density(zeros(V,μlen),σ.mesh)
     μvec = reinterpret(eltype(V),μ.vals)
