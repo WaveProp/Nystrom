@@ -82,4 +82,7 @@ include("maxwellwrappers.jl")
 include("discreteoperator.jl")
 # include("ifgf.jl")
 
+# module that extends the DIM method to Maxwell equation
+include("MaxwellDIM/MaxwellDIM.jl")
+
 end # module
