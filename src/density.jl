@@ -15,7 +15,7 @@ Base.size(σ::Density,args...)     = size(σ.vals,args...)
 Base.getindex(σ::Density,args...) = getindex(σ.vals,args...)
 Base.setindex(σ::Density,args...) = setindex(σ.vals,args...)
 
-Density(etype::DataType,surf)  = Density(zeros(etype,length(surf)),surf)
+Density(etype::DataType,surf)  = Density(zeros(etype,length(dofs(surf))),surf)
 Density(pde::AbstractPDE,surf) = Density(default_density_eltype(pde),surf)
 
 function Density(f::Function,X)

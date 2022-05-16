@@ -20,6 +20,7 @@ Random.seed!(1)
         exp(im*2*norm(x))
     end
     @test eltype(σ) == ComplexF64
+    @test zero(σ) == Density(ComplexF64,mesh)
 
     n = 10
     Amat = rand(ComplexF64,n,length(Nystrom.dofs(mesh)))
@@ -43,6 +44,7 @@ Random.seed!(1)
         cross(normal(target), SingleLayerKernel(pde)(xout,target)*c)
     end
     @test eltype(σ) == SVector{3,Float64}
+    @test zero(σ) == Density(SVector{3,Float64},mesh)
 
     n = 10
     V = Nystrom.default_kernel_eltype(pde)
