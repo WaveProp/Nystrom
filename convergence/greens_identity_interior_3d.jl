@@ -11,8 +11,7 @@ xs = SVector(3,3,3)
 ops = (
     Laplace(;dim=3),
     Helmholtz(;dim=3,k=1.2),
-    Elastostatic(;dim=3,μ=2,λ=3),
-    Maxwell(;k=2)
+    Elastostatic(;dim=3,μ=2,λ=3)
 )
 pde = ops[1] # chose your pde here
 T    = Nystrom.default_density_eltype(pde)

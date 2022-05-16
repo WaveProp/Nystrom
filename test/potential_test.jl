@@ -43,8 +43,7 @@ Random.seed!(1)
         ops = (
             Laplace(;dim=3),
             Helmholtz(;dim=3,k=1.2),
-            Elastostatic(;dim=3,μ=2,λ=3),
-            Maxwell(;k=1)
+            Elastostatic(;dim=3,μ=2,λ=3)
         )
         for pde in ops
             S    = SingleLayerPotential(pde,mesh)
@@ -100,8 +99,7 @@ end
         ops = (
             Laplace(;dim=3),
             Helmholtz(;dim=3,k=1.2),
-            Elastostatic(;dim=3,μ=2,λ=3),
-            Maxwell(;k=1)
+            Elastostatic(;dim=3,μ=2,λ=3)
         )
         for pde in ops
             S    = SingleLayerPotential(pde,mesh)

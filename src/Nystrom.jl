@@ -78,7 +78,6 @@ include("integraloperator.jl")
 include("lebedevpoints.jl")
 include("dim.jl")
 include("gausskronrod.jl")
-include("maxwellwrappers.jl")
 include("discreteoperator.jl")
 # include("ifgf.jl")
 

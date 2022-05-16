@@ -14,8 +14,7 @@ dx  = λ/ppw
 # select pde
 pdes = [Laplace(dim=3),
         Helmholtz(dim=3,k=k),
-        Elastostatic(dim=3,μ=1,λ=2),
-        Maxwell(dim=3,k=k)]
+        Elastostatic(dim=3,μ=1,λ=2)]
 pde = pdes[2]
 
 # select operator
