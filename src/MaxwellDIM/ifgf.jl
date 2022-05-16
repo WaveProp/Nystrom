@@ -66,3 +66,12 @@ function ifgf_compressor(;kwargs...)
     end
     return compress
 end
+
+# Interface with `Density`
+function LinearAlgebra.mul!(y::Density{<:SVector},
+                            A::IFGF.IFGFOp{<:SMatrix},
+                            x::Density{<:SVector},
+                            a::Number,b::Number)
+    mul!(Nystrom.vals(y),A,Nystrom.vals(x),a,b)
+    return y
+end
