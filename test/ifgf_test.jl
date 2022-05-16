@@ -6,13 +6,13 @@ using LinearAlgebra
 Random.seed!(1)
 
 @testset "IFGF test" begin
-    k    = 2π       # wavenumber
+    k    = π       # wavenumber
     λ    = 2π/k     # wavelength
     ppw  = 4        # points per wavelength
     dx   = λ/ppw    # distance between points
-    nmax = 20       # max points per leaf box
-    p    = (3,5,5)  # interpolation points per dimension
+    order = (3,5,5)  # interpolation order per dimension
     pde  = Helmholtz(dim=3,k=k)
+    nsample = 20    # number of points to measure the error
 
     # geometry
     Geometry.clear_entities!()
@@ -21,17 +21,27 @@ Random.seed!(1)
     Γ   = boundary(Ω)
     np  = ceil(Int,2/dx)
     M   = ParametricSurfaces.meshgen(Γ,(np,np))
-    msh = NystromMesh(M,Γ;order=1)
-    nx = length(msh.dofs)
-    Xpts = msh.dofs
-    B = rand(ComplexF64, nx)
+    nmesh = NystromMesh(M,Γ;order=2)
+    Xpts = Ypts = nmesh |> Nystrom.qcoords |> collect
+    npts = length(Nystrom.dofs(nmesh))
+    T    = ComplexF64
+    B    = rand(T,npts)
 
-    for op in [SingleLayerOperator, DoubleLayerOperator]
-        iop = op(pde,msh)
-        compress = IFGFCompressor(;p,nmax)
-        A = compress(iop)
-        exa = iop*B
-        @test norm(A*B-exa)/norm(exa) < 1e-2
-        # @info "" norm(A*B-exa)/norm(exa)
+    # TODO: adapt IFGF to more operators
+    for op in (SingleLayerOperator,)
+        iop = op(pde,nmesh)
+        K = Nystrom.kernel(iop)
+        compress = ifgf_compressor(;order)
+        L = compress(iop)
+
+        J  = rand(1:npts,nsample)
+        B  = randn(T,npts)
+        yw = Nystrom.qweights(nmesh) |> collect
+        exa = [sum(K(Xpts[i],Ypts[j])*yw[j]*B[j] for j in 1:npts) for i in J]
+
+        y = similar(B)
+        mul!(y,L,B)
+        er = norm(y[J]-exa) / norm(exa) # relative error
+        @test er < 1e-6
     end
 end

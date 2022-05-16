@@ -58,8 +58,8 @@ export
     coords,
     qcoords,
     γ₀,
-    γ₁
-    # IFGFCompressor
+    γ₁,
+    ifgf_compressor
 
 WavePropBase.@export_interface
 
@@ -74,7 +74,7 @@ include("lebedevpoints.jl")
 include("dim.jl")
 include("gausskronrod.jl")
 include("discreteoperator.jl")
-# include("ifgf.jl")
+include("ifgf.jl")
 
 # module that extends the DIM method to the Maxwell's equations
 include("MaxwellDIM/MaxwellDIM.jl")

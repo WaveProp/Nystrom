@@ -20,4 +20,4 @@ using SafeTestsets
 
 @safetestset "MaxwellDIM" begin include("MaxwellDIM/runtests.jl") end
 
-# @safetestset "IFGF" begin include("ifgf_test.jl") end
+@safetestset "IFGF" begin include("ifgf_test.jl") end
