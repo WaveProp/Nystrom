@@ -111,16 +111,91 @@ end
 # Helmholtz CFIE Regularizer
 ###
 
+"""
+    struct Scalar2VectorOp
+
+Convenient structure used to wrap an operator `op`,
+which normally multiplies `AbstractVector{<:Number}`, so that 
+`d::Scalar2VectorOp(op;dofs_per_qnode::Int64)` can multiply
+`x::AbstractVector{SVector{dofs_per_qnode,<:Number}}` by multiplying
+`op` with each component of the `SVector`s.
+
+# Example
+```julia-repl
+julia> n = 2
+2
+
+julia> dofs_per_qnode = 3
+3
+
+julia> A = [1 2; 3 4]
+2×2 Matrix{Int64}:
+ 1  2
+ 3  4
+
+julia> x = [SVector(3.,-2.,9.),SVector(1.,0.,-5.)]
+2-element Vector{SVector{3, Float64}}:
+ [3.0, -2.0, 9.0]
+ [1.0, 0.0, -5.0]
+
+julia> As = MaxwellDIM.Scalar2VectorOp(A;dofs_per_qnode)
+Nystrom.MaxwellDIM.Scalar2VectorOp([1 2; 3 4], 3)
+
+julia> As*x ≈ A*x
+true
+```
+"""
+struct Scalar2VectorOp
+    op
+    dofs_per_qnode::Int64
+    function Scalar2VectorOp(op;dofs_per_qnode)
+        return new(op,dofs_per_qnode)
+    end
+end
+
+function Base.:*(d::Scalar2VectorOp,x::AbstractVector{<:Number})
+    @assert iszero(length(x)%d.dofs_per_qnode)
+    xr = reshape(x,d.dofs_per_qnode,:) |> transpose
+    yr = Nystrom._mymul(d.op,xr)
+    y = reshape(transpose(yr),size(x))
+    return y
+end
+function Base.:*(d::Scalar2VectorOp,x::AbstractVector{T}) where {T<:SVector}
+    V = eltype(T)
+    xv = reinterpret(V,x)
+    yv = d*xv
+    y = reinterpret(T,yv)
+    return y
+end
+
+function LinearAlgebra.mul!(y::AbstractVector{<:Number},
+                            d::Scalar2VectorOp,
+                            x::AbstractVector{<:Number},
+                            a,b)
+    @assert iszero(length(x)%d.dofs_per_qnode)
+    xr = reshape(x,d.dofs_per_qnode,:) |> transpose
+    yr = reshape(y,d.dofs_per_qnode,:) |> transpose
+    Nystrom._mymul!(yr,d.op,xr,a,b)
+    return y
+end
+function LinearAlgebra.mul!(y::AbstractVector{T},
+                            d::Scalar2VectorOp,
+                            x::AbstractVector{T},
+                            a,b) where {T<:SVector}
+    V = eltype(T)
+    xv = reinterpret(V,x)
+    yv = reinterpret(V,y)
+    mul!(yv,d,xv,a,b)
+    return y
+end
+
 function helmholtz_regularizer(pde::Maxwell, nmesh; δ=1/2, kwargs...)
     k = Nystrom.parameters(pde)
     k_helmholtz = im*k*δ
     pdeHelmholtz = Nystrom.Helmholtz(;dim=3,k=k_helmholtz)
     S,_ = Nystrom.single_doublelayer_dim(pdeHelmholtz,nmesh;kwargs...)
-    # TODO: implement efficient version without
-    # assembling the full matrix
-    Smat = Nystrom.materialize(S)
-    T = Nystrom.default_kernel_eltype(pde)
-    diagI = spdiagm([one(T) for _ in 1:size(Smat,1)])
-    R = (Smat*diagI) |> Nystrom.blockmatrix_to_matrix |> Nystrom.DiscreteOp 
+    # the regularizer should act on vector quantities instead of 
+    # scalar quantities
+    R = Scalar2VectorOp(S;dofs_per_qnode=3) # currents have 3 components (Jx,Jy,Jz) 
     return R
 end
