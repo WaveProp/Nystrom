@@ -5,7 +5,7 @@ using LinearAlgebra
 using Nystrom.MaxwellDIM
 
 k = π
-pde   = TrueMaxwell(;k)
+pde   = Maxwell(;k)
 Nystrom.clear_entities!()
 r     = 0.5
 n     = 1

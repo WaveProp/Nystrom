@@ -7,12 +7,13 @@ using SparseArrays
 
 export 
     # types
-    TrueMaxwell,
+    Maxwell,
     # functions
     EFIEPotential,
     MFIEPotential,
     EFIEOperator,
-    MFIEOperator
+    MFIEOperator,
+    diagonal_ncross_and_jacobian_matrices
 
 include("kernels.jl")
 include("dim.jl")

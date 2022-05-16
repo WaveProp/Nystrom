@@ -2,25 +2,25 @@
 # PDE
 ###
 """
-    TrueMaxwell{T} <: Nystrom.AbstractPDE{3}
+    Maxwell{T} <: Nystrom.AbstractPDE{3}
 
 Normalized Maxwell's equation ∇ × ∇ × E - k² E = 0.
 """
-struct TrueMaxwell{T} <: Nystrom.AbstractPDE{3}
+struct Maxwell{T} <: Nystrom.AbstractPDE{3}
     k::T
 end
 
-TrueMaxwell(;k::T) where {T} = TrueMaxwell{T}(k)
+Maxwell(;k::T) where {T} = Maxwell{T}(k)
 
-Nystrom.parameters(pde::TrueMaxwell) = pde.k
+Nystrom.parameters(pde::Maxwell) = pde.k
 
-function Base.show(io::IO,::TrueMaxwell)
+function Base.show(io::IO,::Maxwell)
     # k = parameters(pde)
     print(io,"∇ × ∇ × E - k² E = 0")
 end
 
-Nystrom.default_kernel_eltype(::TrueMaxwell)   = SMatrix{3,3,ComplexF64,9}
-Nystrom.default_density_eltype(::TrueMaxwell)  = SVector{3,ComplexF64}
+Nystrom.default_kernel_eltype(::Maxwell)   = SMatrix{3,3,ComplexF64,9}
+Nystrom.default_density_eltype(::Maxwell)  = SVector{3,ComplexF64}
 
 ###
 # Potentials
@@ -28,12 +28,12 @@ Nystrom.default_density_eltype(::TrueMaxwell)  = SVector{3,ComplexF64}
 # The Potential kernels are different from the IntegralOperator kernels.
 
 # EFIE Potential Kernel
-struct EFIEPotentialKernel{T,Op<:TrueMaxwell} <: Nystrom.AbstractPDEKernel{T,Op}
+struct EFIEPotentialKernel{T,Op<:Maxwell} <: Nystrom.AbstractPDEKernel{T,Op}
     pde::Op
 end
 
 # MFIE Potential Kernel
-struct MFIEPotentialKernel{T,Op<:TrueMaxwell} <: Nystrom.AbstractPDEKernel{T,Op}
+struct MFIEPotentialKernel{T,Op<:Maxwell} <: Nystrom.AbstractPDEKernel{T,Op}
     pde::Op
 end
 
@@ -68,19 +68,19 @@ function (SL::MFIEPotentialKernel{T})(target,source)::T  where T
     return curl_G
 end
 
-EFIEPotential(op::TrueMaxwell,surf) = Nystrom.IntegralPotential(EFIEPotentialKernel(op),surf)
-MFIEPotential(op::TrueMaxwell,surf) = Nystrom.IntegralPotential(MFIEPotentialKernel(op),surf)
+EFIEPotential(op::Maxwell,surf) = Nystrom.IntegralPotential(EFIEPotentialKernel(op),surf)
+MFIEPotential(op::Maxwell,surf) = Nystrom.IntegralPotential(MFIEPotentialKernel(op),surf)
 
 ###
 # Integral Operators Kernel
 ###
 # EFIE Kernel
-struct EFIEKernel{T,Op<:TrueMaxwell} <: Nystrom.AbstractPDEKernel{T,Op}
+struct EFIEKernel{T,Op<:Maxwell} <: Nystrom.AbstractPDEKernel{T,Op}
     pde::Op
 end
 
 # MFIE Kernel
-struct MFIEKernel{T,Op<:TrueMaxwell} <: Nystrom.AbstractPDEKernel{T,Op}
+struct MFIEKernel{T,Op<:Maxwell} <: Nystrom.AbstractPDEKernel{T,Op}
     pde::Op
 end
 
@@ -100,8 +100,36 @@ function (DL::MFIEKernel{T})(target,source)::T where T
     return ncross*pot(target,source)
 end
 
-EFIEOperator(op::TrueMaxwell,X,Y=X) = Nystrom.IntegralOperator(EFIEKernel(op), X, Y)
-MFIEOperator(op::TrueMaxwell,X,Y=X) = Nystrom.IntegralOperator(MFIEKernel(op), X, Y)
+EFIEOperator(op::Maxwell,X,Y=X) = Nystrom.IntegralOperator(EFIEKernel(op), X, Y)
+MFIEOperator(op::Maxwell,X,Y=X) = Nystrom.IntegralOperator(MFIEKernel(op), X, Y)
+
+###
+# Extras
+###
+function diagonal_ncross_and_jacobian_matrices(nmesh)
+    qnodes = Nystrom.dofs(nmesh)
+    n_qnodes = length(qnodes)
+    # construct diagonal matrices as sparse arrays using BlockSparseConstructor
+    Tn = qnodes |> first |> Nystrom.normal |> Nystrom.cross_product_matrix |> typeof
+    Tj = qnodes |> first |> Nystrom.jacobian |> typeof
+    Td = SMatrix{2,3,Float64,6}  # TODO: remove harcoded type
+    nblock = Nystrom.BlockSparseConstructor(Tn,n_qnodes,n_qnodes)
+    jblock = Nystrom.BlockSparseConstructor(Tj,n_qnodes,n_qnodes)
+    dblock = Nystrom.BlockSparseConstructor(Td,n_qnodes,n_qnodes)
+    for i in 1:n_qnodes
+        q = qnodes[i]
+        n = Nystrom.cross_product_matrix(normal(q))
+        j = Nystrom.jacobian(q)
+        d = Td(pinv(j))
+        Nystrom.addentry!(nblock,i,i,n)
+        Nystrom.addentry!(jblock,i,i,j)
+        Nystrom.addentry!(dblock,i,i,d)
+    end
+    return sparse(nblock), sparse(jblock), sparse(dblock)
+end
+diagonal_ncross_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[1]
+diagonal_jacobian_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[2]
+diagonal_dualjacobian_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[3]
 
 
 

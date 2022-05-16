@@ -1,4 +1,4 @@
-function truemaxwell_dim(pde::TrueMaxwell,X,Y=X;compress=Matrix,location=:onsurface)
+function maxwell_dim(pde::Maxwell,X,Y=X;compress=Matrix,location=:onsurface)
     msg = "unrecognized value for kw `location`: received $location.
            Valid options are `:onsurface`, `:inside` and `:outside`."
     σ = location === :onsurface ? -0.5 : location === :inside ? 0 : location === :outside ? -1 : error(msg)

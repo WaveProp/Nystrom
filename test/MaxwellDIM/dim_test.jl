@@ -12,7 +12,7 @@ using StaticArrays
     M   = ParametricSurfaces.meshgen(Γ,(4,4))
     mesh = NystromMesh(view(M,Γ),order=3)
     xs = SVector(0.1,-0.1,0.2)
-    pde = TrueMaxwell(;k=1)
+    pde = Maxwell(;k=1)
         
     V    = Nystrom.default_density_eltype(pde)
     c    = rand(V)
@@ -26,7 +26,7 @@ using StaticArrays
     # error in exterior Stratton-Chu identity
     error_strattonchu(EFIE,MFIE) = (EFIE*γ₁E+MFIE*γ₀E-γ₀E/2)/γ₀E_norm
     e0 = error_strattonchu(Tmat,Kmat)
-    Tdim, Kdim = MaxwellDIM.truemaxwell_dim(pde,mesh)
+    Tdim, Kdim = MaxwellDIM.maxwell_dim(pde,mesh)
     e1 = error_strattonchu(Tdim,Kdim)
     @test norm(e0,Inf) > norm(e1,Inf)
     @test norm(e1,Inf) < rtol
