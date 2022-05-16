@@ -40,20 +40,12 @@ _materialize(d::AbstractDiscreteOp,x) = materialize(d)*x
 struct UniformScalingDiscreteOp{T<:Number} <: AbstractDiscreteOp
     λ::T
 end
+UniformScalingDiscreteOp(d::UniformScaling) = UniformScalingDiscreteOp(d.λ)
 
 function LinearAlgebra.mul!(y,d::UniformScalingDiscreteOp,x,a,b)
-    return mul!(y,materialize(d),x,a,b)
+    return _mymul!(y,materialize(d),x,a,b)
 end
-function LinearAlgebra.mul!(y::Vector{<:SVector},d::UniformScalingDiscreteOp,x::Vector{<:SVector},a,b)
-    # Currently, Julia (v1.7.1) doesn't support
-    # LinearAlgebra.mul!(y::Vector{<:SVector},
-    #                    d::Union{Number,UniformScaling},
-    #                    x::Vector{<:SVector},
-    #                    a,b)
-    # That's why this function is needed.
-    @. y = a*d.λ*x + b*y
-    return y
-end
+
 function Base.:*(d::UniformScalingDiscreteOp,x::AbstractVecOrMat) 
     return d.λ*x
 end
@@ -76,6 +68,7 @@ struct DiscreteOp{D} <: AbstractDiscreteOp
     op::D
 end
 DiscreteOp(d::AbstractDiscreteOp) = d
+DiscreteOp(d::Union{<:Number,UniformScaling}) = UniformScalingDiscreteOp(d)
 Base.:*(d::DiscreteOp,x::AbstractVecOrMat) = _mymul(d.op,x)
 materialize(d::DiscreteOp) = d.op
 
@@ -100,14 +93,14 @@ CompositeDiscreteOp(d1::CompositeDiscreteOp, d2::CompositeDiscreteOp) = Composit
 
 function LinearAlgebra.mul!(z,d::CompositeDiscreteOp,x,a,b)
     # evaluate product from right to left
-    y = last(d.maps)*x
+    y = _mymul(last(d.maps),x)
     length(d.maps) == 2 && return mul!(z,first(d.maps),y,a,b)
     return mul!(z,CompositeDiscreteOp(d.maps[1:end-1]),y,a,b)
 end
 function Base.:*(d::CompositeDiscreteOp,x::AbstractVecOrMat) 
     # evaluate product from right to left
-    y = last(d.maps)*x
-    length(d.maps) == 2 && return first(d.maps)*y
+    y = _mymul(last(d.maps),x)
+    length(d.maps) == 2 && return _mymul(first(d.maps),y)
     return CompositeDiscreteOp(d.maps[1:end-1])*y
 end
 function Base.:*(d1::AbstractDiscreteOp, d2::AbstractDiscreteOp)
@@ -233,6 +226,7 @@ end
 Base.size(g::DiscreteOpGMRES) = (g.s, g.s)
 Base.size(g::DiscreteOpGMRES, i) = size(g)[i]
 Base.eltype(::DiscreteOpGMRES{D,T}) where {D,T} = T
+
 function LinearAlgebra.mul!(yvec::AbstractVector{T}, g::DiscreteOpGMRES{D,T}, xvec::AbstractVector{T}) where {D,T}
     return mul!(yvec,g.op,xvec)
 end

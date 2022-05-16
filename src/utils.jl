@@ -42,8 +42,11 @@ end
 # in Julia that happen when `Matrix{<:SMatrix}` are operated
 # with `Vector{<:SVector}`, or some similar combination.
 
+# convenient aliases
 const AbstractMatrixOrDiagonal = Union{AbstractMatrix{T},
                                        Diagonal{T}} where T
+const MatrixOrReinterpretMatrix = Union{Matrix{T},
+                                        Base.ReinterpretArray{T,D,V,<:Matrix}} where {T,D,V}
 
 """
     _mymul!(y,A,x,a,b)
@@ -81,14 +84,22 @@ function _mymul!(y::AbstractVector{<:SVector},
     end
     return y
 end
+function _mymul!(y::AbstractVector{<:SVector},
+                 D::UniformScaling,
+                 x::AbstractVector{<:SVector},a,b)
+    @. y = a*D.λ*x + b*y
+    return y
+end
 
 """
     _mymul(A,B)
     
 Same as `*(A,B)`, but fixes a bug that
 occurs when an argument is a `Diagonal{<:SMatrix}` and
-the other is a `Matrix{<:SMatrix}`.
+the other is a `MatrixOrReinterpretMatrix{<:SArray}`.
 """
-_mymul(A,B)                                         = A*B
-_mymul(A::Diagonal{<:SMatrix},B::Matrix{<:SArray}) = A.diag.*B
-_mymul(A::Matrix{<:SMatrix},B::Diagonal{<:SMatrix}) = A.*permutedims(B.diag)
+_mymul(A,B)                                     = A*B
+_mymul(A::Diagonal{<:SMatrix},
+       B::MatrixOrReinterpretMatrix{<:SArray})  = A.diag.*B
+_mymul(A::MatrixOrReinterpretMatrix{<:SMatrix},
+       B::Diagonal{<:SMatrix})                  = A.*permutedims(B.diag)

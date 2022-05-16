@@ -44,6 +44,7 @@ function _maxwell_auxiliary_quantities_dim(iop,T,K,basis,γ₁_basis,σ)
     xnodes      = Nystrom.dofs(X)
     num_targets = length(xnodes)
     R,R_block = Nystrom.MatrixAndBlockIndexer(V,num_targets,num_basis)
+    @info "Integrating DIM basis..."
     _maxwell_integrate_auxiliary_matrices!(R,T,K,γ₀B,γ₁B) # R .= -T*γ₁B - K*γ₀B
     if X === Y
         axpy!(σ,γ₀B,R)  # R += σ*γ₀B
@@ -70,10 +71,32 @@ function _maxwell_integrate_auxiliary_matrices!(R,T::Matrix,K::Matrix,γ₀B,γ�
     mul!(R,T,γ₁B,-1,false)
     mul!(R,K,γ₀B,-1,1)
 end
+function _maxwell_integrate_auxiliary_matrices!(R,
+                                                T::Nystrom.CompositeDiscreteOp,
+                                                K::Nystrom.CompositeDiscreteOp,
+                                                γ₀B,γ₁B)
+    # Check that the operators `T` and `K`
+    # contain an `IFGFOp`. This operators
+    # should have a structure like `Nx*L*Wy`,
+    # where the second operator `L` should be an `IFGFOp`.
+    @assert T.maps[2].op isa IFGF.IFGFOp
+    @assert K.maps[2].op isa IFGF.IFGFOp
+    # The `IFGFOp`s should receive matrices of `SVector`s instead
+    # of matrices of scalars
+    R_r   = reinterpret(SVector{3,ComplexF64},R)
+    γ₀B_r = reinterpret(SVector{3,ComplexF64},γ₀B)
+    γ₁B_r = reinterpret(SVector{3,ComplexF64},γ₁B)
+    # R .= -T*γ₁B - K*γ₀B
+    for i in 1:size(R_r,2)
+        mul!(view(R_r,:,i),T,view(γ₁B_r,:,i),-1,false)
+        mul!(view(R_r,:,i),K,view(γ₀B_r,:,i),-1,1)
+    end
+end
 
 function _maxwell_singular_weights_dim(Top,γ₀B,γ₁B,R,dict_near)
     # initialize vectors for the sparse matrix, then dispatch to type-stable
     # method for each element type
+    @info "Computing DIM corrections..."
     Y  = Nystrom.source_surface(Top)
     V  = eltype(Top)
     sizeop = size(Top)
