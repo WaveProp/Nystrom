@@ -66,7 +66,6 @@ end
         S,_ = Nystrom.single_doublelayer_dim(pdeHelmholtz,mesh)
         Smat = Nystrom.materialize(S)
         @test eltype(R) == eltype(S)
-        @test size(R) == size(S).*3
 
         σ = rand(SVector{3,ComplexF64},size(Smat,2))
         σvec = reinterpret(ComplexF64,σ)

@@ -22,8 +22,6 @@ Base.:-(d::AbstractDiscreteOp,_) = abstractmethod(d)
 Base.:-(_,d::AbstractDiscreteOp) = abstractmethod(d)
 Base.:*(d::AbstractDiscreteOp,_) = abstractmethod(d)
 Base.:*(_,d::AbstractDiscreteOp) = abstractmethod(d)
-Base.size(d::AbstractDiscreteOp) = abstractmethod(d)
-Base.size(d::AbstractDiscreteOp,i::Integer) = size(d)[i]
 LinearAlgebra.mul!(y,d::AbstractDiscreteOp,x,a,b) = abstractmethod(d)
 
 """
@@ -36,19 +34,12 @@ matrix additions and multiplications.
 materialize(d::AbstractDiscreteOp) = abstractmethod(d)
 _materialize(d::AbstractDiscreteOp,x) = materialize(d)*x
 
-_check_dim_mul(A,B) = @assert(size(A,2) == size(B,1))
-_check_dim_mul(A::Matrix{<:Number},B::Density{V}) where {V<:SVector} = @assert(size(A,2)==size(B,1)*length(V))
-
-_check_dim_sum(A,B) = @assert(size(A) == size(B))
-
 ############
 # UniformScalingDiscreteOp
 ############
 struct UniformScalingDiscreteOp{T<:Number} <: AbstractDiscreteOp
     λ::T
-    s::Int64  # size
 end
-Base.size(d::UniformScalingDiscreteOp) = (d.s,d.s)
 
 function LinearAlgebra.mul!(y,d::UniformScalingDiscreteOp,x,a,b)
     return mul!(y,materialize(d),x,a,b)
@@ -64,18 +55,16 @@ function LinearAlgebra.mul!(y::Vector{<:SVector},d::UniformScalingDiscreteOp,x::
     return y
 end
 function Base.:*(d::UniformScalingDiscreteOp,x::AbstractVecOrMat) 
-    _check_dim_mul(d,x)
     return d.λ*x
 end
 function Base.:*(d1::UniformScalingDiscreteOp,d2::UniformScalingDiscreteOp) 
-    _check_dim_mul(d1,d2)
-    return UniformScalingDiscreteOp(d1.λ*d2.λ, size(d1,1))
+    return UniformScalingDiscreteOp(d1.λ*d2.λ)
 end
 function Base.:*(d::UniformScalingDiscreteOp,α::Number)
-    return UniformScalingDiscreteOp(d.λ*α, size(d,2))
+    return UniformScalingDiscreteOp(d.λ*α)
 end
 function Base.:*(α::Number,d::UniformScalingDiscreteOp)
-    return UniformScalingDiscreteOp(α*d.λ, size(d,1))
+    return UniformScalingDiscreteOp(α*d.λ)
 end
 
 materialize(d::UniformScalingDiscreteOp) = UniformScaling(d.λ)
@@ -87,7 +76,6 @@ struct DiscreteOp{D} <: AbstractDiscreteOp
     op::D
 end
 DiscreteOp(d::AbstractDiscreteOp) = d
-Base.size(d::DiscreteOp) = size(d.op)
 Base.:*(d::DiscreteOp,x::AbstractVecOrMat) = _mymul(d.op,x)
 materialize(d::DiscreteOp) = d.op
 
@@ -110,36 +98,31 @@ CompositeDiscreteOp(d1::AbstractDiscreteOp, d2::CompositeDiscreteOp) = Composite
 CompositeDiscreteOp(d1::CompositeDiscreteOp, d2::AbstractDiscreteOp) = CompositeDiscreteOp((d1.maps...,d2)) 
 CompositeDiscreteOp(d1::CompositeDiscreteOp, d2::CompositeDiscreteOp) = CompositeDiscreteOp((d1.maps...,d2.maps...)) 
 
-Base.size(d::CompositeDiscreteOp) = (size(first(d.maps),1), size(last(d.maps),2))
-
 function LinearAlgebra.mul!(z,d::CompositeDiscreteOp,x,a,b)
-    _check_dim_mul(d,x)
     # evaluate product from right to left
     y = last(d.maps)*x
     length(d.maps) == 2 && return mul!(z,first(d.maps),y,a,b)
     return mul!(z,CompositeDiscreteOp(d.maps[1:end-1]),y,a,b)
 end
 function Base.:*(d::CompositeDiscreteOp,x::AbstractVecOrMat) 
-    _check_dim_mul(d,x)
     # evaluate product from right to left
     y = last(d.maps)*x
     length(d.maps) == 2 && return first(d.maps)*y
     return CompositeDiscreteOp(d.maps[1:end-1])*y
 end
 function Base.:*(d1::AbstractDiscreteOp, d2::AbstractDiscreteOp)
-    _check_dim_mul(d1,d2)
     return CompositeDiscreteOp(d1, d2)
 end
 function Base.:*(α::Number, d::AbstractDiscreteOp)
-    return CompositeDiscreteOp(UniformScalingDiscreteOp(α,size(d,1)), d)
+    return CompositeDiscreteOp(UniformScalingDiscreteOp(α), d)
 end
 function Base.:*(d::AbstractDiscreteOp, α::Number)
-    return CompositeDiscreteOp(d, UniformScalingDiscreteOp(α,size(d,2)))
+    return CompositeDiscreteOp(d, UniformScalingDiscreteOp(α))
 end
 Base.:*(u::UniformScaling, d::AbstractDiscreteOp) = u.λ*d
 Base.:*(d::AbstractDiscreteOp, u::UniformScaling) = d*u.λ
 function Base.:-(d::AbstractDiscreteOp)
-    return CompositeDiscreteOp(UniformScalingDiscreteOp(-1,size(d,1)), d)
+    return CompositeDiscreteOp(UniformScalingDiscreteOp(-1), d)
 end
 
 function materialize(d::CompositeDiscreteOp)
@@ -171,18 +154,14 @@ LinearCombinationDiscreteOp(d1::AbstractDiscreteOp, d2::LinearCombinationDiscret
 LinearCombinationDiscreteOp(d1::LinearCombinationDiscreteOp, d2::AbstractDiscreteOp) = LinearCombinationDiscreteOp((d1.maps...,d2)) 
 LinearCombinationDiscreteOp(d1::LinearCombinationDiscreteOp, d2::LinearCombinationDiscreteOp) = LinearCombinationDiscreteOp((d1.maps...,d2.maps...)) 
 
-Base.size(d::LinearCombinationDiscreteOp) = size(first(d.maps))
-
 function LinearAlgebra.mul!(y,d::LinearCombinationDiscreteOp,x,a,b)
-    _check_dim_mul(d,x)
     lmul!(b,y)  # y .= b*y 
     for n in 1:length(d.maps)
         mul!(y,d.maps[n],x,a,true)  # y .+= a*d.maps[n]*x
     end
     return y
 end
-function Base.:*(d::LinearCombinationDiscreteOp,x::AbstractVecOrMat) 
-    _check_dim_mul(d,x)
+function Base.:*(d::LinearCombinationDiscreteOp,x::AbstractVecOrMat)
     # evaluate product from left to right
     y = first(d.maps)*x
     for n in 2:length(d.maps)
@@ -191,16 +170,13 @@ function Base.:*(d::LinearCombinationDiscreteOp,x::AbstractVecOrMat)
     return y
 end
 function Base.:+(d1::AbstractDiscreteOp, d2::AbstractDiscreteOp)
-    _check_dim_sum(d1,d2)
     return LinearCombinationDiscreteOp(d1, d2)
 end
 function Base.:+(u::UniformScaling, d::AbstractDiscreteOp)
-    @assert size(d,1) == size(d,2)
-    return UniformScalingDiscreteOp(u.λ,size(d,1)) + d
+    return UniformScalingDiscreteOp(u.λ) + d
 end
 function Base.:+(d::AbstractDiscreteOp, u::UniformScaling)
-    @assert size(d,1) == size(d,2)
-    return d + UniformScalingDiscreteOp(u.λ,size(d,2))
+    return d + UniformScalingDiscreteOp(u.λ)
 end
 Base.:-(u::UniformScaling, d::AbstractDiscreteOp) = u+(-d)
 Base.:-(d::AbstractDiscreteOp, u::UniformScaling) = d+(-u)
@@ -213,8 +189,8 @@ function materialize(d::LinearCombinationDiscreteOp)
         !isa(d.maps[map_index], UniformScalingDiscreteOp) && break
         map_index += 1
     end
-    msg = """Cannot materialize a LinearCombinationDiscreteOp
-    whose maps are all UniformScalingDiscreteOp. Not implemented."""
+    msg = """Cannot materialize a `LinearCombinationDiscreteOp`
+    whose maps are all `UniformScalingDiscreteOp`. Not implemented."""
     @assert (map_index ≤ length(d.maps)) msg
     # materialize map and
     # evaluate the sum from left to right
@@ -240,26 +216,25 @@ struct DiscreteOpGMRES{D<:AbstractDiscreteOp,T<:Number}
     op::D
     s::Int64  # scalar matrix size
 end
-function DiscreteOpGMRES(op::AbstractDiscreteOp, σ::AbstractVector{V}) where V
-    @assert size(op,1) == size(op,2)
-    _check_dim_mul(op,σ)
-    if V <: Number
-        s = length(σ)  # size
-        return DiscreteOpGMRES{typeof(op),V}(op, s)
-    elseif V <: SVector
-        T = eltype(V)
-        s = length(σ) * length(V)  # size
-        return DiscreteOpGMRES{typeof(op),T}(op, s)
-    else
-        notimplemented()
-    end
+
+function DiscreteOpGMRES(::AbstractDiscreteOp, ::AbstractVector)
+    notimplemented()
 end
+function DiscreteOpGMRES(op::AbstractDiscreteOp, σ::AbstractVector{V}) where {V<:Number}
+    s = length(σ)  # size
+    return DiscreteOpGMRES{typeof(op),V}(op, s)
+end
+function DiscreteOpGMRES(op::AbstractDiscreteOp, σ::AbstractVector{V}) where {V<:SVector}
+    T = eltype(V)
+    s = length(σ) * length(V)  # size
+    return DiscreteOpGMRES{typeof(op),T}(op, s)
+end
+
 Base.size(g::DiscreteOpGMRES) = (g.s, g.s)
 Base.size(g::DiscreteOpGMRES, i) = size(g)[i]
 Base.eltype(::DiscreteOpGMRES{D,T}) where {D,T} = T
 function LinearAlgebra.mul!(yvec::AbstractVector{T}, g::DiscreteOpGMRES{D,T}, xvec::AbstractVector{T}) where {D,T}
-    yvec .= g.op*xvec
-    return yvec
+    return mul!(yvec,g.op,xvec)
 end
 
 function IterativeSolvers.gmres!(σ::Density{V},A::AbstractDiscreteOp,μ::Density{V},args...;kwargs...) where V
@@ -322,7 +297,7 @@ function _show_typeof(D::Number)
     return string(typeof(D))
 end
 function _show_typeof(D::Nystrom.AbstractDiscreteOp) 
-    return _show_size(D) * ' ' * split(string(typeof(D)),'{')[1]
+    return split(string(typeof(D)),'{')[1]
 end
 
 function _show_content(D::Nystrom.AbstractDiscreteOp, i)

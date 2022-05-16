@@ -23,8 +23,7 @@ Random.seed!(1)
 
     @testset "UniformScalingDiscreteOp test" begin
         λ = -3.5
-        Uop = Nystrom.UniformScalingDiscreteOp(λ,n)
-        @test size(Uop) == (n,n) 
+        Uop = Nystrom.UniformScalingDiscreteOp(λ)
         @test UniformScaling(λ)*x == λ*x == Uop*x
         @test UniformScaling(λ) == Nystrom.materialize(Uop)
         y = Uop*x
@@ -32,7 +31,6 @@ Random.seed!(1)
     end
 
     @testset "DiscreteOp test" begin
-        @test size(A) == size(Aop)
         @test A*x == Aop*x
         @test A == Nystrom.materialize(Aop)
         y = A*x
@@ -40,11 +38,9 @@ Random.seed!(1)
     end
 
     @testset "CompositeDiscreteOp test" begin
-        @test size(C*A) == size(Cop*Aop)
         @test C*(A*x) == Cop*Aop*x == Cop*(Aop*x)
         @test C*A == Nystrom.materialize(Cop*Aop)
 
-        @test size(C*B*A) == size(Cop*Bop*Aop)
         @test length((Cop*Bop*Aop).maps) == 3
         @test C*(B*(A*x)) == Cop*Bop*Aop*x == Cop*Bop*(Aop*x) == Cop*(Bop*Aop)*x
         @test C*(B*A) == Nystrom.materialize(Cop*Bop*Aop)
@@ -54,11 +50,9 @@ Random.seed!(1)
     end
 
     @testset "LinearCombinationDiscreteOp test" begin
-        @test size(α*A - B) == size(α*Aop - Bop)
         @test (α*(A*x) - B*x) == (α*Aop*x - Bop*x) == (α*Aop - Bop)*x
         @test (α*A - B) == Nystrom.materialize(α*Aop - Bop)
 
-        @test size(α*A - B + α*B) == size(α*Aop - Bop + α*Bop)
         @test (α*(A*x) - B*x + α*(B*x)) == (α*Aop - Bop + α*Bop)*x
         @test (α*A - B + α*B) == Nystrom.materialize(α*Aop - Bop + α*Bop)
         op = α*Aop-Bop+α*Bop
@@ -67,7 +61,6 @@ Random.seed!(1)
     end
 
     @testset "Mixed tests" begin
-        @test size(C*α*(α*I+B-α*A)+(1-α)*C) == size(Cop*α*(α*I+Bop-α*Aop)+(1-α)*Cop)
         @test C*(α*(α*x+B*x-α*(A*x)))+(1-α)*(C*x) ≈ (Cop*α*(α*I+Bop-α*Aop)+(1-α)*Cop)*x
         @test C*(α*(α*I+B-α*A))+(1-α)*C == Nystrom.materialize(Cop*α*(α*I+Bop-α*Aop)+(1-α)*Cop)
         op = (Bop*α*(α*I+Bop-α*Aop)+(1-α)*Bop)
