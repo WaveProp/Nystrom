@@ -88,9 +88,11 @@ function _maxwell_integrate_auxiliary_matrices!(R,
     γ₁B_r = reinterpret(SVector{3,ComplexF64},γ₁B)
     # R .= -T*γ₁B - K*γ₀B
     for i in 1:size(R_r,2)
+        print("Progress... $i of $(size(R_r,2)) DIM basis\r")
         mul!(view(R_r,:,i),T,view(γ₁B_r,:,i),-1,false)
         mul!(view(R_r,:,i),K,view(γ₀B_r,:,i),-1,1)
     end
+    print("\n")
 end
 
 function _maxwell_singular_weights_dim(Top,γ₀B,γ₁B,R,dict_near)
