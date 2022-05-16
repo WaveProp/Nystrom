@@ -69,13 +69,35 @@ struct DiscreteOp{D} <: AbstractDiscreteOp
 end
 DiscreteOp(d::AbstractDiscreteOp) = d
 DiscreteOp(d::Union{<:Number,UniformScaling}) = UniformScalingDiscreteOp(d)
-Base.:*(d::DiscreteOp,x::AbstractVecOrMat) = _mymul(d.op,x)
+
 materialize(d::DiscreteOp) = d.op
+
+# A `d::DiscreteOp` will try to adapt the input `x` to 
+# the `d.op` using `reinterpret`.
+Base.:*(d::DiscreteOp,x::AbstractVecOrMat) = _mymul(d.op,x)
+function Base.:*(d::Nystrom.DiscreteOp{<:AbstractMatrix{T}},
+                 x::AbstractVecOrMat{D}) where {T<:SMatrix,D<:Number}
+    V = SVector{size(T,2),D}
+    xv = reinterpret(V,x)
+    yv = _mymul(Nystrom.materialize(d),xv)
+    y = reinterpret(D,yv)
+    return y
+end
 
 function LinearAlgebra.mul!(y,d::DiscreteOp,x,a,b)
     return _mymul!(y,materialize(d),x,a,b)
 end
-         
+function LinearAlgebra.mul!(y::AbstractVecOrMat{D},
+                            d::Nystrom.DiscreteOp{<:AbstractMatrix{T}},
+                            x::AbstractVecOrMat{D},
+                            a,b) where {T<:SMatrix,D<:Number}
+    V = SVector{size(T,2),D}
+    xv = reinterpret(V,x)
+    yv = reinterpret(V,y)
+    _mymul!(yv,Nystrom.materialize(d),xv,a,b)
+    return y
+end
+
 ############
 # CompositeDiscreteOp
 ############
