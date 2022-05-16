@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [deps]
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+IFGF = "b05b8bba-df36-43cd-9ac7-ed4ff3985281"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 Lebedev = "c5712dd9-2571-4e23-b661-b4a261421493"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"

@@ -37,19 +37,20 @@ struct MFIEPotentialKernel{T,Op<:Maxwell} <: Nystrom.AbstractPDEKernel{T,Op}
     pde::Op
 end
 
+const MaxwellPotentialKernel = Union{EFIEPotentialKernel,MFIEPotentialKernel}
+
 # EFIE Potential Kernel definition
 function _efie_potential_kernel(target,source,k)
     x = Nystrom.coords(target)
     y = Nystrom.coords(source)
     rvec = x - y
     r = norm(rvec)
-    iszero(r) && (return zero(SMatrix{3,3,ComplexF64,9}))
     g = exp(im*k*r)/(4π*r) # Helmholtz greens function
     gp  = im*k*g - g/r
     gpp = im*k*gp - gp/r + g/r^2
     RRT = rvec*transpose(rvec) # rvec ⊗ rvecᵗ
     G = g*I + 1/k^2*(gp/r*I + (gpp/r^2 - gp/r^3)*RRT)
-    return G
+    return (!iszero(r))*G
 end
 function (SL::EFIEPotentialKernel)(target,source)
     k = Nystrom.parameters(Nystrom.pde(SL))
@@ -63,12 +64,11 @@ function _mfie_potential_kernel(target,source,k)
     y = Nystrom.coords(source)
     rvec = x - y
     r = norm(rvec)
-    iszero(r) && (return zero(SMatrix{3,3,ComplexF64,9}))
     g   = exp(im*k*r)/(4π*r) # Helmholtz greens function
     gp  = im*k*g - g/r
     rcross = Nystrom.cross_product_matrix(rvec)
     curl_G = gp/r*rcross
-    return curl_G
+    return (!iszero(r))*curl_G
 end
 function (SL::MFIEPotentialKernel)(target,source)
     k = Nystrom.parameters(Nystrom.pde(SL))
@@ -91,6 +91,8 @@ end
 struct MFIEKernel{T,Op<:Maxwell} <: Nystrom.AbstractPDEKernel{T,Op}
     pde::Op
 end
+
+const MaxwellKernel = Union{EFIEKernel,MFIEKernel}
 
 # EFIE Kernel definition
 function (SL::EFIEKernel)(target,source)

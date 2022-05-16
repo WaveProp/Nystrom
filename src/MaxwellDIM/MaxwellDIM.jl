@@ -4,6 +4,7 @@ using StaticArrays
 using LinearAlgebra
 using Nystrom
 using SparseArrays
+import Nystrom.IFGF
 
 export 
     # types
@@ -18,5 +19,6 @@ export
 include("kernels.jl")
 include("dim.jl")
 include("utils.jl")
+include("ifgf.jl")
 
 end
