@@ -68,8 +68,7 @@ Random.seed!(1)
         ops = (
             Laplace(;dim=3),
             Helmholtz(;dim=3,k=1.2),
-            Elastostatic(;dim=3,μ=2,λ=3),
-            Maxwell(;k=2.)
+            Elastostatic(;dim=3,μ=2,λ=3)
         )
         for pde in ops
             T    = Nystrom.default_density_eltype(pde)
@@ -94,7 +93,6 @@ Random.seed!(1)
                 @test norm(e1,Inf) < rtol
             end
             # adjoint double-layer and hypersingular
-            pde isa Maxwell && continue
             K     = AdjointDoubleLayerOperator(pde,mesh)
             Kmat     = K |> Matrix
             H     = HyperSingularOperator(pde,mesh)
@@ -170,8 +168,7 @@ Random.seed!(1)
         ops = (
             Laplace(;dim=3),
             Helmholtz(;dim=3,k=1.2),
-            Elastostatic(;dim=3,μ=2,λ=3),
-            Maxwell(;k=1)
+            Elastostatic(;dim=3,μ=2,λ=3)
         )
         for pde in ops
             T    = Nystrom.default_density_eltype(pde)
@@ -196,7 +193,6 @@ Random.seed!(1)
                 @test norm(e1,Inf) < rtol
             end
             # adjoint double-layer and hypersingular
-            pde isa Maxwell && continue
             K     = AdjointDoubleLayerOperator(pde,mesh)
             Kmat     = K |> Matrix
             H     = HyperSingularOperator(pde,mesh)

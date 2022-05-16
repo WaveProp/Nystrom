@@ -313,31 +313,6 @@ end
 #     return msh1
 # end
 
-function diagonal_ncross_and_jacobian_matrices(nmesh)
-    qnodes = dofs(nmesh)
-    n_qnodes = length(qnodes)
-    # construct diagonal matrices as sparse arrays using BlockSparseConstructor
-    Tn = qnodes |> first |> normal |> cross_product_matrix |> typeof
-    Tj = qnodes |> first |> jacobian |> typeof
-    Td = SMatrix{2,3,Float64,6}  # TODO: remove harcoded type
-    nblock = BlockSparseConstructor(Tn,n_qnodes,n_qnodes)
-    jblock = BlockSparseConstructor(Tj,n_qnodes,n_qnodes)
-    dblock = BlockSparseConstructor(Td,n_qnodes,n_qnodes)
-    for i in 1:n_qnodes
-        q = qnodes[i]
-        n = cross_product_matrix(normal(q))
-        j = jacobian(q)
-        d = Td(pinv(j))
-        addentry!(nblock,i,i,n)
-        addentry!(jblock,i,i,j)
-        addentry!(dblock,i,i,d)
-    end
-    return sparse(nblock), sparse(jblock), sparse(dblock)
-end
-diagonal_ncross_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[1]
-diagonal_jacobian_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[2]
-diagonal_dualjacobian_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[3]
-
 # Plot recipes
 
 struct PlotQuadrature end

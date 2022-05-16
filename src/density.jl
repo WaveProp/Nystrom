@@ -8,14 +8,16 @@ struct Density{V,S<:NystromMesh} <: AbstractVector{V}
     mesh::S
 end
 
+# AbstractArray interface
+Base.size(σ::Density,args...)      = size(vals(σ),args...)
+Base.getindex(σ::Density,args...)  = getindex(vals(σ),args...)
+Base.setindex!(σ::Density,args...) = setindex!(vals(σ),args...)
+Base.similar(σ::Density)           = Density(similar(vals(σ)),mesh(σ))
+
 vals(σ::Density) = σ.vals
 mesh(σ::Density) = σ.mesh
 
-Base.size(σ::Density,args...)     = size(σ.vals,args...)
-Base.getindex(σ::Density,args...) = getindex(σ.vals,args...)
-Base.setindex(σ::Density,args...) = setindex(σ.vals,args...)
-
-Density(etype::DataType,surf)  = Density(zeros(etype,length(surf)),surf)
+Density(etype::DataType,surf)  = Density(zeros(etype,length(dofs(surf))),surf)
 Density(pde::AbstractPDE,surf) = Density(default_density_eltype(pde),surf)
 
 function Density(f::Function,X)
@@ -31,42 +33,92 @@ function γ₁(f,X)
     Density(dof->f(coords(dof),normal(dof)),X)
 end
 
-Base.zero(σ::Density) = Density(zero(σ.vals),mesh(σ))
-
 # overload some unary/binary operations for convenience
-Base.:-(σ::Density) = Density(-σ.vals,σ.mesh)
+Base.:-(σ::Density) = Density(-vals(σ),mesh(σ))
 Base.:+(σ::Density) = σ
-Base.:*(a::Number,σ::Density) = Density(a*σ.vals,σ.mesh)
+Base.:*(a::Number,σ::Density) = Density(a*vals(σ),mesh(σ))
 Base.:*(σ::Density,a::Number) = a*σ
-Base.:/(σ::Density,a::Number) = Density(σ.vals/a,σ.mesh)
+Base.:/(σ::Density,a::Number) = Density(vals(σ)/a,mesh(σ))
 
-Base.:*(A::AbstractMatrix{<:Number},σ::Density{<:Number}) = Density(A*σ.vals,σ.mesh)
-function Base.:*(A::AbstractMatrix{<:Number},σ::Density{V}) where {V<:SVector}
-    σvec = reinterpret(eltype(V),σ.vals)
-    μlen,res = divrem(size(A,1),length(V))
-    @assert res == 0
-    μ = Density(zeros(V,μlen),σ.mesh)
-    μvec = reinterpret(eltype(V),μ.vals)
-    mul!(μvec,A,σvec)
-    return μ
+# `Density` should be able to handle the following cases:
+# mul!(y::Density{<:Number},A::AbstractMatrix{<:Number},x::Density{<:Number})
+# mul!(y::Density{<:SVector},A::AbstractMatrix{<:SMatrix},x::Density{<:SVector})
+# mul!(y::Density{<:SVector},A::AbstractMatrix{<:Number},x::Density{<:SVector})
+
+function LinearAlgebra.mul!(::AbstractVector,
+                            ::AbstractMatrix,
+                            ::Density,
+                            ::Number,::Number)
+    notimplemented()
+end
+function LinearAlgebra.mul!(y::Density{<:Number},
+                            A::AbstractMatrix{<:Number},
+                            x::Density{<:Number},
+                            a::Number,b::Number)
+    _mymul!(vals(y),A,vals(x),a,b)
+    return y
+end
+function LinearAlgebra.mul!(y::Density{<:SVector},
+                            A::AbstractMatrixOrDiagonal{<:SMatrix},
+                            x::Density{<:SVector},
+                            a::Number,b::Number)
+    _mymul!(vals(y),A,vals(x),a,b)
+    return y
+end
+function LinearAlgebra.mul!(y::Density{<:SVector},
+                            A::AbstractMatrix{<:Number},
+                            x::Density{<:SVector},
+                            a::Number,b::Number)
+    
+    yvals = reinterpret(eltype(eltype(y)),vals(y))
+    xvals = reinterpret(eltype(eltype(y)),vals(x))
+    _mymul!(yvals,A,xvals,a,b)
+    return y
 end
 
-Base.:\(A::AbstractMatrix{<:Number},σ::Density{<:Number}) = Density(A\σ.vals,σ.mesh)
+function Base.:*(A::AbstractMatrix{<:Number},x::Density{<:Number})
+    # assume `y::Density{<:Number}` with same length as `x`
+    @assert size(A,1) == size(A,2)
+    y = similar(x)
+    return mul!(y,A,x)
+end
+function Base.:*(A::AbstractMatrixOrDiagonal{<:SMatrix},x::Density{<:SVector})
+    # assume `y::Density` with same length as `x`
+    @assert size(A,1) == size(A,2)
+    T = Base.promote_op(*, eltype(A), eltype(x))
+    y = Density(zeros(T,length(x)),mesh(x))
+    return mul!(y,A,x)
+end
+function Base.:*(A::AbstractMatrix{<:Number},
+                 x::Density{<:SVector})
+    # Infer the resulting Density eltype
+    V = eltype(x)
+    nqnodes,res = divrem(size(A,2),length(V)) # number of qnodes
+    @assert nqnodes == length(x)
+    @assert iszero(res)
+    lengthT,res = divrem(size(A,1),nqnodes)
+    @assert iszero(res)
+    T = SVector{lengthT,eltype(V)}  # new Density eltype
+    y = Density(zeros(T,nqnodes),mesh(x))
+    return mul!(y,A,x)
+end
+
+Base.:\(A::AbstractMatrix{<:Number},σ::Density{<:Number}) = Density(A\vals(σ),mesh(σ))
 function Base.:\(A::AbstractMatrix{<:Number},σ::Density{V}) where {V<:SVector}
     @assert size(A,1) == size(A,2)
-    σvec = reinterpret(eltype(V),σ.vals)
+    σvec = reinterpret(eltype(V),vals(σ))
     μlen,res = divrem(size(A,1),length(V))
     @assert res == 0
-    μ = Density(zeros(V,μlen),σ.mesh)
-    μvec = reinterpret(eltype(V),μ.vals)
+    μ = Density(zeros(V,μlen),mesh(σ))
+    μvec = reinterpret(eltype(V),vals(μ))
     μvec[:] = A\σvec
     return μ
 end
 
 function IterativeSolvers.gmres!(σ::Density{V},A::AbstractMatrix{<:Number},μ::Density{V},args...;kwargs...) where V
     log = haskey(kwargs,:log) ? kwargs[:log] : false
-    σvec = reinterpret(eltype(V),σ.vals)
-    μvec = reinterpret(eltype(V),μ.vals)
+    σvec = reinterpret(eltype(V),vals(σ))
+    μvec = reinterpret(eltype(V),vals(μ))
     if log
         vals,hist = gmres!(σvec,A,μvec,args...;kwargs...)
         return σ,hist
@@ -115,9 +167,9 @@ end
 vals(σ::TangentialDensity) = σ.vals
 mesh(σ::TangentialDensity) = σ.mesh
 
-Base.size(σ::TangentialDensity,args...)     = size(σ.vals,args...)
-Base.getindex(σ::TangentialDensity,args...) = getindex(σ.vals,args...)
-Base.setindex(σ::TangentialDensity,args...) = setindex(σ.vals,args...)
+Base.size(σ::TangentialDensity,args...)     = size(vals(σ),args...)
+Base.getindex(σ::TangentialDensity,args...) = getindex(vals(σ),args...)
+Base.setindex!(σ::TangentialDensity,args...) = setindex!(vals(σ),args...)
 
 function TangentialDensity(σ::Density)
     # original density type must be a 3D vector

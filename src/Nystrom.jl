@@ -26,14 +26,9 @@ using WavePropBase.Trees
 WavePropBase.@import_interface
 
 # Interpolated Factored Green Function Method
-# import IFGF
-# import IFGF: IFGFOperator, centered_factor
+import IFGF
 
 export
-    # Gmsh related stuff
-    GmshSDK,
-    @gmsh,
-    gmsh,
     # re-export useful stuff
     Geometry,
     ParametricSurfaces,
@@ -63,8 +58,8 @@ export
     coords,
     qcoords,
     γ₀,
-    γ₁
-    # IFGFCompressor
+    γ₁,
+    ifgf_compressor
 
 WavePropBase.@export_interface
 
@@ -78,8 +73,10 @@ include("integraloperator.jl")
 include("lebedevpoints.jl")
 include("dim.jl")
 include("gausskronrod.jl")
-include("maxwellwrappers.jl")
 include("discreteoperator.jl")
-# include("ifgf.jl")
+include("ifgf.jl")
+
+# module that extends the DIM method to the Maxwell's equations
+include("MaxwellDIM/MaxwellDIM.jl")
 
 end # module

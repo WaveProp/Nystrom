@@ -1,103 +1,115 @@
-# Interpolated Factored Green Function (IFGF) Method interface
+####
+# Interpolated Factored Green Function (IFGF) method interface
+####
 
-wavenumber(p::AbstractPDE)    = abstractmethod(p)
-wavenumber(::Laplace)         = nothing
-wavenumber(p::Helmholtz)      = p.k
-wavenumber(::Elastostatic)    = nothing
-wavenumber(p::Maxwell)        = p.k
-wavenumber(k::AbstractKernel) = wavenumber(pde(k))
+IFGF.wavenumber(::AbstractKernel) = notimplemented()
 
-function IFGF.IFGFOperator(iop::IntegralOperator;
-                           p=(3,5,5),
-                           nmax=100,
-                           _splitter=IFGF.DyadicSplitter,
-                           _profile=false)
+IFGF.centered_factor(::AbstractKernel,x,Y)     = notimplemented()
+IFGF.inv_centered_factor(::AbstractKernel,x,Y) = notimplemented()
+IFGF.transfer_factor(::AbstractKernel,x,Y)     = notimplemented()
+
+####
+# IFGF wrappers
+####
+
+"""
+    _ifgf_compress(iop::IntegralOperator;kwargs...)
+
+Compress an `iop::IntegralOperator` into a `IFGFOp`.
+The `kwargs` arguments are passed to `IFGF.assemble_ifgf`.
+The returned object is a `DiscreteOp` which contains the
+`IFGFOp`.
+"""
+function _ifgf_compress(iop::IntegralOperator;kwargs...)
+    # The IFGF only compresses the kernel without
+    # the `weights`, therefore they must 
+    # be considered separately.
     K = kernel(iop)
-    Ypts = iop |> source_surface |> dofs
-    Xpts = iop |> target_surface |> dofs
-    splitter = _splitter(;nmax)
-    p_func = (node) -> p 
-    k = wavenumber(K)
-    ds_func = IFGF.cone_domain_size_func(k)
-    ifgf = IFGF.IFGFOperator(K,Ypts,Xpts;splitter,p_func,ds_func,_profile)
-    # wrap ifgf and qweights together as a DiscreteOp
-    # (kernels do not include qweights)
-    w = iop |> source_surface |> qweights |> collect |> Diagonal
-    op = DiscreteOp(ifgf)*DiscreteOp(w)
-    return op
+    T = default_density_eltype(pde(K))
+    Xmesh = target_surface(iop)
+    Ymesh = source_surface(iop)
+    Wy_list = qweights(Ymesh)
+    X = Xmesh |> qcoords |> collect
+    Y = Xmesh===Ymesh ? X : Ymesh|>qcoords|>collect
+    ifgf = IFGF.assemble_ifgf(K,X,Y;kwargs...)  # IFGF operator
+    # diagonal matrix of weights
+    if T <: Number
+        Wy = collect(Wy_list) |> Diagonal
+    else
+        notimplemented()
+    end
+    L = DiscreteOp(ifgf)*DiscreteOp(Wy)
+    return L
 end
 
-function IFGFCompressor(;p=(3,5,5),
-                        nmax=100,
-                        _splitter=IFGF.DyadicSplitter,
-                        _profile=false)
-    return (iop::IntegralOperator) -> IFGFOperator(iop;p,nmax,_splitter,_profile)
+"""
+    ifgf_compressor(;kwargs...)
+
+Return a `compress` function, which should be passed to `assemble_dim`
+to compress `IntegralOperator`s into `IFGFOp`s. The `kwargs`
+arguments are passed to `IFGF.assemble_ifgf`.
+"""
+function ifgf_compressor(;kwargs...)
+    compress = (iop::IntegralOperator) -> _ifgf_compress(iop;kwargs...)
+    return compress
 end
 
-# AbstractKernel
-IFGF.centered_factor(K::AbstractKernel,x,y::IFGF.SourceTree) = abstractmethod(K)
+####
+# Interface with `Density`
+####
 
+function LinearAlgebra.mul!(y::Density{<:SVector},
+                            A::IFGF.IFGFOp{<:SMatrix},
+                            x::Density{<:SVector},
+                            a::Number,b::Number)
+    mul!(vals(y),A,vals(x),a,b)
+return y
+end
+
+####
 # Laplace
-function IFGF.centered_factor(K::SingleLayerKernel{T,<:Laplace},x,y::IFGF.SourceTree) where T
-    yc = IFGF.center(y)
-    return K(x,yc)
-end
-function IFGF.centered_factor(::DoubleLayerKernel{T,<:Laplace},x,y::IFGF.SourceTree) where T
-    yc = IFGF.center(y)
-    # TODO: pick a better centered_factor
-    r = coords(x)-yc
-    d = norm(r)
-    return 1/d
-end
+####
 
+####
 # Helmholtz
-function IFGF.centered_factor(K::SingleLayerKernel{T,<:Helmholtz{3}},x,y::IFGF.SourceTree) where T
-    yc = IFGF.center(y)
-    # return exp(im*k*d)/d
-    return K(x,yc)
-end
-function IFGF.centered_factor(K::DoubleLayerKernel{T,<:Helmholtz{3}},x,y::IFGF.SourceTree) where T
-    yc = IFGF.center(y)
-    k = wavenumber(K)
-    r = coords(x)-yc
-    d = norm(r)
-    return exp(im*k*d)/d*(-im*k+1/d)
+####
+
+const HelmholtzSingleLayerKernel3D = SingleLayerKernel{T,S} where {T,S<:Helmholtz{3}}
+
+IFGF.wavenumber(K::HelmholtzSingleLayerKernel3D) = K|>pde|>parameters|>real
+
+function IFGF.centered_factor(K::HelmholtzSingleLayerKernel3D,x,Y)
+    yc = IFGF.center(Y)
+    r  = x-yc
+    k  = parameters(pde(K))
+    d  = norm(r)
+    g  = exp(im*k*d)/(4π*d)  # Helmholtz Green's function
+    return g
 end
 
+function IFGF.inv_centered_factor(K::HelmholtzSingleLayerKernel3D, x, Y)
+    # return inv(centered_factor(K, x, Y))
+    yc = IFGF.center(Y)
+    r  = x-yc
+    k  = parameters(pde(K))
+    d  = norm(r)
+    invg = (4π*d)/exp(im*k*d)  # inverse of Helmholtz Green's function
+    return invg
+end
+
+function IFGF.transfer_factor(K::HelmholtzSingleLayerKernel3D, x, Y)
+    Yparent = parent(Y)
+    # return inv_centered_factor(K, x, Yparent) * centered_factor(K, x, Y)
+    k   = parameters(pde(K))
+    yc  = IFGF.center(Y)
+    ycp = IFGF.center(Yparent)
+    r   = x-yc
+    rp  = x-ycp
+    d   = norm(r)
+    dp  = norm(rp)
+    return dp/d*exp(im*k*(d-dp))
+end
+
+####
 # Elastostatic
-function IFGF.centered_factor(::SingleLayerKernel{T,<:Elastostatic{3}},x,y::IFGF.SourceTree) where T
-    yc = IFGF.center(y)
-    r = coords(x)-yc
-    d = norm(r)
-    return 1/d
-end
-function IFGF.centered_factor(::DoubleLayerKernel{T,<:Elastostatic{3}},x,y::IFGF.SourceTree) where T
-    yc = IFGF.center(y)
-    # TODO: pick a better centered_factor
-    r = coords(x)-yc
-    d = norm(r)
-    return 1/d
-end
-
-# Maxwell
-function IFGF.centered_factor(K::SingleLayerKernel{T,<:Maxwell},x,y::IFGF.SourceTree) where T
-    yc = IFGF.center(y)
-    # TODO: pick a better centered_factor
-    k = wavenumber(K)
-    r = coords(x)-yc
-    d = norm(r)
-    g = exp(im*k*d)/(4π*d)
-    # gp  = im*k*g - g/d
-    # gpp = im*k*gp - gp/d + g/d^2
-    # RRT = rvec*transpose(rvec) # rvec ⊗ rvecᵗ
-    return g   
-end
-function IFGF.centered_factor(K::DoubleLayerKernel{T,<:Maxwell},x,y::IFGF.SourceTree) where T
-    yc = IFGF.center(y)
-    # TODO: pick a better centered_factor
-    k = wavenumber(K)
-    r = coords(x)-yc
-    d = norm(r)
-    g = exp(im*k*d)/(4π*d)
-    return g   
-end
+####

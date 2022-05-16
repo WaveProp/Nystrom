@@ -4,6 +4,9 @@ using LinearAlgebra
 using IterativeSolvers
 using Plots
 
+# TODO: update test
+
+#=
 ##
 k = 3.3
 pde = Maxwell(;dim=3,k)
@@ -74,3 +77,4 @@ for p in 1:5
     plot!(fig,sqrt_ndofs,cc./sqrt_ndofs.^p,xscale=:log10,yscale=:log10,label="h^$p",ls=:dash)
 end
 display(fig)
+=#

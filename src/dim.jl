@@ -206,11 +206,7 @@ function _singular_weights_dim(op1::IntegralOperator,op2::IntegralOperator,γ₀
     δDblock = BlockSparseConstructor(T,sizeop...)
     Dcoeff,_ = combined_field_coefficients(op2)
     for (E,list_near) in dict_near
-        if pde(kernel(op1)) isa Maxwell
-            _singular_weights_dim_maxwell!(δSblock,δDblock,Scoeff,Dcoeff,Y,γ₀B,γ₁B,R,E,list_near)
-        else
-            _singular_weights_dim!(δSblock,δDblock,Scoeff,Dcoeff,Y,γ₀B,γ₁B,R,E,list_near)
-        end
+        _singular_weights_dim!(δSblock,δDblock,Scoeff,Dcoeff,Y,γ₀B,γ₁B,R,E,list_near)
     end
     # convert to SparseMatrixCSC{<:Number}
     δS = sparse(δSblock)
@@ -246,50 +242,6 @@ end
             Js = j_glob
             Ss = Scoeff * view(Gblock,(num_qnodes+1):(2*num_qnodes))
             Ds = Dcoeff * view(Gblock,1:num_qnodes)
-            addentries!(δSblock,Is,Js,Ss)
-            addentries!(δDblock,Is,Js,Ds)
-        end
-    end
-end
-
-@noinline function _singular_weights_dim_maxwell!(δSblock,δDblock,Scoeff,Dcoeff,Y,γ₀B,γ₁B,R,E,list_near)
-    qnodes = dofs(Y)
-    T = eltype(δSblock)  # block type
-    T2 = SMatrix{2,3,ComplexF64,6}
-    T3 = SMatrix{3,2,ComplexF64,6}
-    el2qnodes = elt2dof(Y,E)
-    num_qnodes, num_els = size(el2qnodes)
-    γ₀B_block = BlockIndexer(γ₀B,T)
-    γ₁B_block = BlockIndexer(γ₁B,T)
-    R_block   = BlockIndexer(R,T)
-    num_basis = size(γ₀B_block,2)
-    M,Mblock  = MatrixAndBlockIndexer(T2,2*num_qnodes,num_basis)
-    H,Hblock  = MatrixAndBlockIndexer(T,1,num_basis)
-    G,Gblock  = MatrixAndBlockIndexer(T3,1,2*num_qnodes)
-    Ss = Vector{T}(undef,num_qnodes)  # for single layer (EFIE)
-    Ds = Vector{T}(undef,num_qnodes)  # for double layer (MFIE)
-    @assert length(list_near) == num_els
-    for n in 1:num_els
-        j_glob = @view el2qnodes[:,n]
-        for p in 1:num_basis
-            for k in 1:num_qnodes
-                J = jacobian(qnodes[j_glob[k]])
-                Mblock[k,p]            = transpose(J)*γ₀B_block[j_glob[k],p]
-                Mblock[num_qnodes+k,p] = transpose(J)*γ₁B_block[j_glob[k],p]
-            end
-        end
-        F = qr!(M)
-        for i in list_near[n]
-            Hblock[:,:] = @view R_block[i:i,:]
-            G[:,:] = (H/F.R)*adjoint(F.Q)
-            for k in 1:num_qnodes
-                J     = jacobian(qnodes[j_glob[k]])
-                Ds[k] = Dcoeff*Gblock[k]*transpose(J)
-                Ss[k] = Scoeff*Gblock[k+num_qnodes]*transpose(J)
-            end
-            # add entries to BlockSparseConstructor
-            Is = fill(i,num_qnodes)
-            Js = j_glob
             addentries!(δSblock,Is,Js,Ss)
             addentries!(δDblock,Is,Js,Ds)
         end

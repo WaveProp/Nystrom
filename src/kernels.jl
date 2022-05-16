@@ -1,6 +1,6 @@
 abstract type AbstractPDE{N} end
 
-Geometry.ambient_dimension(pde::AbstractPDE{N}) where {N} = N
+Geometry.ambient_dimension(::AbstractPDE{N}) where {N} = N
 
 """
     abstract type AbstractKernel{T}
@@ -12,16 +12,7 @@ A kernel functions `K` with the signature `K(target,source)::T`.
 abstract type AbstractKernel{T} end
 
 return_type(::AbstractKernel{T}) where {T} = T
-
 ambient_dimension(K::AbstractKernel) = ambient_dimension(pde(K))
-
-"""
-    pde(K::AbstractKernel)
-
-Return the underlying `AbstractPDE` when `K` correspond to the kernel of an
-integral operator derived from a partial differential equation.
-"""
-pde(k::AbstractKernel) = k.pde
 
 """
     struct GenericKernel{T,F} <: AbstractKernel{T}
@@ -33,33 +24,47 @@ struct GenericKernel{T,F} <: AbstractKernel{T}
 end
 
 """
-    struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
+    abstract type AbstractPDEKernel{T,Op} <: AbstractKernel{T}
+
+An [`AbstractKernel`](@ref) with an associated `pde::Op`.
+"""
+abstract type AbstractPDEKernel{T,Op} <: AbstractKernel{T} end
+
+"""
+    pde(K::AbstractPDEKernel)
+
+Return the underlying `AbstractPDE` when `K` correspond to the kernel of an
+integral operator derived from a partial differential equation.
+"""
+pde(k::AbstractPDEKernel) = k.pde
+
+# convenient constructor
+(K::Type{<:AbstractPDEKernel})(op) = K{default_kernel_eltype(op),typeof(op)}(op)
+
+"""
+    struct SingleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
 
 Given an operator `Op::Abstract`, construct its free-space single-layer kernel (i.e. the
 fundamental solution).
 """
-struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
+struct SingleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
     pde::Op
 end
-SingleLayerKernel{T}(op) where {T} = SingleLayerKernel{T,typeof(op)}(op)
-SingleLayerKernel(op)              = SingleLayerKernel{default_kernel_eltype(op)}(op)
 
 """
-    struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
+    struct DoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
 
 Given an operator `Op`, construct its free-space double-layer kernel. This
 corresponds to the `γ₁` trace of the [`SingleLayerKernel`](@ref). For operators
 such as [`Laplace`](@ref) or [`Helmholtz`](@ref), this is simply the normal
 derivative of the fundamental solution respect to the source variable.
 """
-struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
+struct DoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
     pde::Op
 end
-DoubleLayerKernel{T}(op) where {T}     = DoubleLayerKernel{T,typeof(op)}(op)
-DoubleLayerKernel(op)                  = DoubleLayerKernel{default_kernel_eltype(op)}(op)
 
 """
-    struct AdjointDoubleLayerKernel{T,Op} <: AbstractKernel{T}
+    struct AdjointDoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
 
 Given an operator `Op`, construct its free-space adjoint double-layer kernel. This
 corresponds to the `transpose(γ₁,ₓ[G])`, where `G` is the
@@ -67,14 +72,12 @@ corresponds to the `transpose(γ₁,ₓ[G])`, where `G` is the
 [`Helmholtz`](@ref), this is simply the normal derivative of the fundamental
 solution respect to the target variable.
 """
-struct AdjointDoubleLayerKernel{T,Op} <: AbstractKernel{T}
+struct AdjointDoubleLayerKernel{T,Op} <: AbstractPDEKernel{T,Op}
     pde::Op
 end
-AdjointDoubleLayerKernel{T}(op) where {T} = AdjointDoubleLayerKernel{T,typeof(op)}(op)
-AdjointDoubleLayerKernel(op)              = AdjointDoubleLayerKernel{default_kernel_eltype(op)}(op)
 
 """
-    struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
+    struct HyperSingularKernel{T,Op} <: AbstractPDEKernel{T,Op}
 
 Given an operator `Op`, construct its free-space hypersingular kernel. This
 corresponds to the `transpose(γ₁,ₓγ₁[G])`, where `G` is the
@@ -82,11 +85,9 @@ corresponds to the `transpose(γ₁,ₓγ₁[G])`, where `G` is the
 [`Helmholtz`](@ref), this is simply the normal derivative of the fundamental
 solution respect to the target variable of the `DoubleLayerKernel`.
 """
-struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
+struct HyperSingularKernel{T,Op} <: AbstractPDEKernel{T,Op}
     pde::Op
 end
-HyperSingularKernel{T}(op) where {T} = HyperSingularKernel{T,typeof(op)}(op)
-HyperSingularKernel(op)              = HyperSingularKernel{default_kernel_eltype(op)}(op)
 
 # a trait for the kernel type
 struct SingleLayer end
@@ -400,97 +401,4 @@ function (HS::HyperSingularKernel{T,S})(target,source)::T where {T,S<:Elastostat
                                   (1-4ν)*nx*transpose(ny)
                                   )
     end
-end
-
-################################################################################
-################################# Maxwell ######################################
-################################################################################
-
-"""
-    Maxwell{T} <: AbstractPDE{3}
-
-Normalized Maxwell's equation ∇ × ∇ × E - k² E = 0, where
-k = ω √ϵμ.
-"""
-struct Maxwell{T} <: AbstractPDE{3}
-    k::T
-end
-
-Maxwell(;dim=3,k::T) where {T}        = Maxwell{T}(k)
-
-parameters(pde::Maxwell) = pde.k
-
-function Base.show(io::IO,pde::Maxwell)
-    # k = parameters(pde)
-    print(io,"∇ × ∇ × E - k² E = 0")
-end
-
-default_kernel_eltype(::Maxwell)   = SMatrix{3,3,ComplexF64,9}
-default_density_eltype(::Maxwell)  = SVector{3,ComplexF64}
-
-# Single Layer kernel for Maxwell is the dyadic Greens function
-function (SL::SingleLayerKernel{T,S})(target,source)::T  where {T,S<:Maxwell}
-    k  = parameters(pde(SL))
-    x  = coords(target)
-    y  = coords(source)
-    rvec = x - y
-    r = norm(rvec)
-    r == 0 && return zero(T)
-    # helmholtz greens function
-    g   = exp(im*k*r)/(4π*r)
-    gp  = im*k*g - g/r
-    gpp = im*k*gp - gp/r + g/r^2
-    RRT = rvec*transpose(rvec) # rvec ⊗ rvecᵗ
-    G   = g*I + 1/k^2*(gp/r*I + (gpp/r^2 - gp/r^3)*RRT)
-    # TODO: when multiplying by a density, it is faster to exploit the outer
-    # product format isntead of actually assemblying the matrices.
-    return G
-end
-
-# Double Layer Kernel
-function (DL::DoubleLayerKernel{T,S})(target,source)::T where {T,S<:Maxwell}
-    k  = parameters(pde(DL))
-    x  = coords(target)
-    y  = coords(source)
-    ny = normal(source)
-    rvec = x - y
-    r      = norm(rvec)
-    r == 0 && return zero(T)
-    g      = exp(im*k*r)/(4π*r)
-    gp     = im*k*g - g/r
-    rcross = cross_product_matrix(rvec)
-    ncross = cross_product_matrix(ny)
-    return ncross * rcross * gp/r |> transpose
-end
-
-"""
-    _curl_y_green_tensor_maxwell(x, y, k)
-
-Returns `∇ʸ × G(x, y)` where `G` is the Green tensor for Maxwell's equations
-with wavenumber `k`.
-"""
-function _curl_y_green_tensor_maxwell(x, y, k)
-    rvec = x - y
-    r    = norm(rvec)
-    g    = exp(im*k*r)/(4π*r)
-    gp   = im*k*g - g/r
-    rcross = cross_product_matrix(rvec)
-    curl_G = -gp/r*rcross
-    return curl_G
-end
-
-"""
-    _curl_x_green_tensor_maxwell(x, y, k)
-
-Returns `∇ˣ × G(x, y)` where `G` is the Green tensor for Maxwell's equations
-with wavenumber `k`.
-"""
-function _curl_x_green_tensor_maxwell(x, y, k)
-    rvec = x - y
-    r = norm(rvec)
-    g    = exp(im*k*r)/(4π*r)
-    gp  = im*k*g - g/r
-    rcross = cross_product_matrix(rvec)
-    curl_G = gp/r*rcross
-    return curl_G
 end
