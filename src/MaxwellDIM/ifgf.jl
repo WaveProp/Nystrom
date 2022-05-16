@@ -32,3 +32,33 @@ function IFGF.transfer_factor(K::MaxwellPotentialKernel, x, Y)
     dp  = norm(rp)
     return dp/d*exp(im*k*(d-dp))
 end
+
+## IFGF wrapper
+
+"""
+    ifgf_compressor(;kwargs...)
+
+Returns a `compress` function, which should be passed to `maxwell_dim`
+to compress `IntegralOperator` into `IFGFOp`. The `kwargs`
+arguments are passed to the `IFGF.assemble_ifgf`.
+"""
+function ifgf_compressor(;kwargs...)
+    function compress(iop::MaxwellOperator)
+        # The IFGF only compresses the kernel without
+        # the `ncross` and `weights`, therefore they should 
+        # be added separately.
+        pot_kernel = iop |> Nystrom.kernel |> potential_kernel
+        Xmesh = Nystrom.target_surface(iop)
+        Ymesh = Nystrom.source_surface(iop)
+        X = Xmesh |> Nystrom.qcoords |> collect
+        Y = Ymesh |> Nystrom.qcoords |> collect
+        # diagonal matrix of ncross(x)
+        Nx = Nystrom.cross_product_matrix.(Xmesh|>Nystrom.qnormals)|>Diagonal
+        # diagonal matrix of weights(y)
+        Wy = Ymesh |> Nystrom.qweights |> collect |> Diagonal
+        # IFGF operator
+        L = IFGF.assemble_ifgf(pot_kernel,X,Y;kwargs...)
+        return Nystrom.DiscreteOp(Nx)*Nystrom.DiscreteOp(L)*Nystrom.DiscreteOp(Wy)
+    end
+    return compress
+end

@@ -79,6 +79,8 @@ end
 EFIEPotential(op::Maxwell,surf) = Nystrom.IntegralPotential(EFIEPotentialKernel(op),surf)
 MFIEPotential(op::Maxwell,surf) = Nystrom.IntegralPotential(MFIEPotentialKernel(op),surf)
 
+const MaxwellPotential = Nystrom.IntegralOperator{<:MaxwellPotentialKernel}
+
 ###
 # Integral Operators Kernel
 ###
@@ -114,3 +116,15 @@ end
 
 EFIEOperator(op::Maxwell,X,Y=X) = Nystrom.IntegralOperator(EFIEKernel(op), X, Y)
 MFIEOperator(op::Maxwell,X,Y=X) = Nystrom.IntegralOperator(MFIEKernel(op), X, Y)
+
+const MaxwellOperator = Nystrom.IntegralOperator{T,<:MaxwellKernel} where T
+
+"""
+    potential_kernel(K::EFIEKernel)
+    potential_kernel(K::MFIEKernel)
+
+Returns the underlying `MaxwellPotentialKernel` (e.g. `EFIEPotentialKernel`)
+associated with a `MaxwellKernel` kernel (e.g. `EFIEKernel`).
+"""
+potential_kernel(K::EFIEKernel) = EFIEPotentialKernel(Nystrom.pde(K))
+potential_kernel(K::MFIEKernel) = MFIEPotentialKernel(Nystrom.pde(K))

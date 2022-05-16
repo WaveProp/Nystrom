@@ -14,7 +14,8 @@ export
     MFIEPotential,
     EFIEOperator,
     MFIEOperator,
-    diagonal_ncross_and_jacobian_matrices
+    diagonal_ncross_and_jacobian_matrices,
+    ifgf_compressor
 
 include("kernels.jl")
 include("dim.jl")
