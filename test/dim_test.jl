@@ -23,6 +23,7 @@ Random.seed!(1)
         for pde in ops
             T    = Nystrom.default_density_eltype(pde)
             c    = rand(T)
+            α,β  = rand(eltype(T),2)  # combined field coefficients
             u    = (qnode) -> SingleLayerKernel(pde)(qnode,xout)*c
             dudn = (qnode) -> AdjointDoubleLayerKernel(pde)(qnode,xout)*c
             γ₀u   = Density(u,mesh)
@@ -42,6 +43,9 @@ Random.seed!(1)
                 @test norm(e0,Inf) > norm(e1,Inf)
                 @test norm(e1,Inf) < rtol
             end
+            C = CombinedFieldOperator(pde,mesh;α,β)
+            Cdim = Nystrom.assemble_dim(C)
+            @test Nystrom.materialize(Cdim) ≈ α*Nystrom.materialize(Ddim)-β*Nystrom.materialize(Sdim)
             # adjoint double-layer and hypersingular
             K     = AdjointDoubleLayerOperator(pde,mesh)
             Kmat     = K |> Matrix
@@ -55,6 +59,9 @@ Random.seed!(1)
                 @test norm(e0,Inf) > rtol
                 @test norm(e1,Inf) < rtol
             end
+            AC = AdjointCombinedFieldOperator(pde,mesh;α,β)
+            ACdim = Nystrom.assemble_dim(AC)
+            @test Nystrom.materialize(ACdim) ≈ α*Nystrom.materialize(Hdim)-β*Nystrom.materialize(Kdim)
         end
     end
 
@@ -74,6 +81,7 @@ Random.seed!(1)
         for pde in ops
             T    = Nystrom.default_density_eltype(pde)
             c    = rand(T)
+            α,β  = rand(eltype(T),2)  # combined field coefficients
             u    = (qnode) -> SingleLayerKernel(pde)(xout,qnode)*c
             dudn = (qnode) -> transpose(DoubleLayerKernel(pde)(xout,qnode))*c
             γ₀u   = Density(u,mesh)
@@ -93,6 +101,9 @@ Random.seed!(1)
                 @test norm(e0,Inf) > norm(e1,Inf)
                 @test norm(e1,Inf) < rtol
             end
+            C = CombinedFieldOperator(pde,mesh;α,β)
+            Cdim = Nystrom.assemble_dim(C)
+            @test Nystrom.materialize(Cdim) ≈ α*Nystrom.materialize(Ddim)-β*Nystrom.materialize(Sdim)
             # adjoint double-layer and hypersingular
             pde isa Maxwell && continue
             K     = AdjointDoubleLayerOperator(pde,mesh)
@@ -107,6 +118,9 @@ Random.seed!(1)
                 @test norm(e0,Inf) > norm(e1,Inf)
                 @test norm(e1,Inf) < rtol
             end
+            AC = AdjointCombinedFieldOperator(pde,mesh;α,β)
+            ACdim = Nystrom.assemble_dim(AC)
+            @test Nystrom.materialize(ACdim) ≈ α*Nystrom.materialize(Hdim)-β*Nystrom.materialize(Kdim)
         end
     end
 
@@ -125,6 +139,7 @@ Random.seed!(1)
         for pde in ops
             T    = Nystrom.default_density_eltype(pde)
             c    = rand(T)
+            α,β  = rand(eltype(T),2)  # combined field coefficients
             u    = (qnode) -> SingleLayerKernel(pde)(xin,qnode)*c
             dudn = (qnode) -> transpose(DoubleLayerKernel(pde)(xin,qnode))*c
             γ₀u   = Density(u,mesh)
@@ -144,6 +159,9 @@ Random.seed!(1)
                 @test norm(e0,Inf) > norm(e1,Inf)
                 @test norm(e1,Inf) < rtol
             end
+            C = CombinedFieldOperator(pde,mesh;α,β)
+            Cdim = Nystrom.assemble_dim(C)
+            @test Nystrom.materialize(Cdim) ≈ α*Nystrom.materialize(Ddim)-β*Nystrom.materialize(Sdim)
             # adjoint double-layer and hypersingular
             K     = AdjointDoubleLayerOperator(pde,mesh)
             Kmat     = K |> Matrix
@@ -157,6 +175,9 @@ Random.seed!(1)
                 @test norm(e0,Inf) > rtol
                 @test norm(e1,Inf) < rtol
             end
+            AC = AdjointCombinedFieldOperator(pde,mesh;α,β)
+            ACdim = Nystrom.assemble_dim(AC)
+            @test Nystrom.materialize(ACdim) ≈ α*Nystrom.materialize(Hdim)-β*Nystrom.materialize(Kdim)
         end
     end
 
@@ -176,6 +197,7 @@ Random.seed!(1)
         for pde in ops
             T    = Nystrom.default_density_eltype(pde)
             c    = rand(T)
+            α,β  = rand(eltype(T),2)  # combined field coefficients
             u    = (qnode) -> SingleLayerKernel(pde)(xs,qnode)*c
             dudn = (qnode) -> transpose(DoubleLayerKernel(pde)(xs,qnode))*c
             γ₀u   = Density(u,mesh)
@@ -195,6 +217,9 @@ Random.seed!(1)
                 @test norm(e0,Inf) > norm(e1,Inf)
                 @test norm(e1,Inf) < rtol
             end
+            C = CombinedFieldOperator(pde,mesh;α,β)
+            Cdim = Nystrom.assemble_dim(C)
+            @test Nystrom.materialize(Cdim) ≈ α*Nystrom.materialize(Ddim)-β*Nystrom.materialize(Sdim)
             # adjoint double-layer and hypersingular
             pde isa Maxwell && continue
             K     = AdjointDoubleLayerOperator(pde,mesh)
@@ -209,6 +234,9 @@ Random.seed!(1)
                 @test norm(e0,Inf) > norm(e1,Inf)
                 @test norm(e1,Inf) < rtol
             end
+            AC = AdjointCombinedFieldOperator(pde,mesh;α,β)
+            ACdim = Nystrom.assemble_dim(AC)
+            @test Nystrom.materialize(ACdim) ≈ α*Nystrom.materialize(Hdim)-β*Nystrom.materialize(Kdim)
         end
     end
 end

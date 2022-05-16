@@ -88,21 +88,72 @@ end
 HyperSingularKernel{T}(op) where {T} = HyperSingularKernel{T,typeof(op)}(op)
 HyperSingularKernel(op)              = HyperSingularKernel{default_kernel_eltype(op)}(op)
 
+"""
+    struct CombinedFieldKernel{T,Op} <: AbstractKernel{T}
+
+Given an operator `Op`, construct its free-space combined field kernel. This
+corresponds to a linear combination of `S::SingleLayerKernel` and `D::DoubleLayerKernel`
+of the form `α*D - β*S`.
+"""
+struct CombinedFieldKernel{T,Op,Tm<:Number} <: AbstractKernel{T}
+    pde::Op
+    α::Tm
+    β::Tm
+end
+CombinedFieldKernel{T}(op,α::Tm,β::Tm) where {T,Tm} = CombinedFieldKernel{T,typeof(op),Tm}(op,α,β)
+CombinedFieldKernel(op,α,β) = CombinedFieldKernel{default_kernel_eltype(op)}(op,promote(α,β)...)
+
+"""
+    struct AdjointCombinedFieldKernel{T,Op} <: AbstractKernel{T}
+
+Given an operator `Op`, construct its free-space adjoint combined field kernel. This
+corresponds to a linear combination of `K::AdjointDoubleLayerKernel` and `H::HyperSingularKernel`
+of the form `α*H - β*K`.
+"""
+struct AdjointCombinedFieldKernel{T,Op,Tm<:Number} <: AbstractKernel{T}
+    pde::Op
+    α::Tm
+    β::Tm
+end
+AdjointCombinedFieldKernel{T}(op,α::Tm,β::Tm) where {T,Tm} = AdjointCombinedFieldKernel{T,typeof(op),Tm}(op,α,β)
+AdjointCombinedFieldKernel(op,α,β) = AdjointCombinedFieldKernel{default_kernel_eltype(op)}(op,promote(α,β)...)
+
 # a trait for the kernel type
 struct SingleLayer end
 struct DoubleLayer end
 struct AdjointDoubleLayer end
 struct HyperSingular end
+struct CombinedField end
+struct AdjointCombinedField end
 
-kernel_type(::SingleLayerKernel)        = SingleLayer()
-kernel_type(::DoubleLayerKernel)        = DoubleLayer()
-kernel_type(::AdjointDoubleLayerKernel) = AdjointDoubleLayer()
-kernel_type(::HyperSingularKernel)      = HyperSingular()
+kernel_type(::SingleLayerKernel)          = SingleLayer()
+kernel_type(::DoubleLayerKernel)          = DoubleLayer()
+kernel_type(::AdjointDoubleLayerKernel)   = AdjointDoubleLayer()
+kernel_type(::HyperSingularKernel)        = HyperSingular()
+kernel_type(::CombinedFieldKernel)        = CombinedField()
+kernel_type(::AdjointCombinedFieldKernel) = AdjointCombinedField()
 
 combined_field_coefficients(::SingleLayerKernel)        = (0,-1)
 combined_field_coefficients(::DoubleLayerKernel)        = (1,0)
 combined_field_coefficients(::AdjointDoubleLayerKernel) = (0,-1)
 combined_field_coefficients(::HyperSingularKernel)      = (1,0)
+combined_field_coefficients(r::CombinedFieldKernel)     = (r.α,r.β)
+combined_field_coefficients(r::AdjointCombinedFieldKernel) = (r.α,r.β)
+
+# definition of combined field kernels
+function (CF::CombinedFieldKernel)(target,source)
+    SL = SingleLayerKernel(pde(CF))
+    DL = DoubleLayerKernel(pde(CF))
+    α,β = combined_field_coefficients(CF) 
+    return α*DL(target,source) - β*SL(target,source)
+end
+
+function (CF::AdjointCombinedFieldKernel)(target,source)
+    K = AdjointDoubleLayerKernel(pde(CF))
+    H = HyperSingularKernel(pde(CF))
+    α,β = combined_field_coefficients(CF) 
+    return α*H(target,source) - β*K(target,source)
+end
 
 ################################################################################
 ################################# LAPLACE ######################################

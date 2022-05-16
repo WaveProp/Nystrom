@@ -4,19 +4,25 @@ function assemble_dim(iop::IntegralOperator;compress=Matrix,location=:onsurface)
     pde  = iop.kernel.pde
     T    = kernel_type(iop)
     if T === SingleLayer()
-        singlelayer_dim(pde,X,Y;compress,location)
+        return singlelayer_dim(pde,X,Y;compress,location)
     elseif T === DoubleLayer()
-        doublelayer_dim(pde,X,Y;compress,location)
+        return doublelayer_dim(pde,X,Y;compress,location)
     elseif T === AdjointDoubleLayer()
-        adjointdoublelayer_dim(pde,X,Y;compress,location)
+        return adjointdoublelayer_dim(pde,X,Y;compress,location)
     elseif T === HyperSingular()
-        hypersingular_dim(pde,X,Y;compress,location)
+        return hypersingular_dim(pde,X,Y;compress,location)
+    elseif T === CombinedField() 
+        α,β = combined_field_coefficients(iop)
+        return combinedfield_dim(pde,X,Y;α,β,compress,location)
+    elseif T === AdjointCombinedField() 
+        α,β = combined_field_coefficients(iop)
+        return adjointcombinedfield_dim(pde,X,Y;α,β,compress,location)
     else
         notimplemented()
     end
 end
 
-function single_doublelayer_dim(pde,X,Y=X;compress=Matrix,location=:onsurface)
+function _single_doublelayer_dim(pde,X,Y=X;compress=Matrix,location=:onsurface)
     msg = "unrecognized value for kw `location`: received $location.
            Valid options are `:onsurface`, `:inside` and `:outside`."
     σ = location === :onsurface ? -0.5 : location === :inside ? -1 : location === :outside ? 0 : error(msg)
@@ -39,15 +45,29 @@ function single_doublelayer_dim(pde,X,Y=X;compress=Matrix,location=:onsurface)
     @timeit_debug "compute dim correction" begin
         δS,δD = _singular_weights_dim(Sop,Dop,γ₀B,γ₁B,R,dict_near)
     end
+    return S,D,δS,δD
+end
+function single_doublelayer_dim(args...;kwargs...)
+    S,D,δS,δD = _single_doublelayer_dim(args...;kwargs...)
     # convert to DiscreteOp
-    S_discrete = DiscreteOp(S) + DiscreteOp(δS)
-    D_discrete = DiscreteOp(D) + DiscreteOp(δD)
-    return S_discrete,D_discrete
+    Sd = DiscreteOp(S) + DiscreteOp(δS)
+    Dd = DiscreteOp(D) + DiscreteOp(δD)
+    return Sd,Dd
 end
 singlelayer_dim(args...;kwargs...) = single_doublelayer_dim(args...;kwargs...)[1]
 doublelayer_dim(args...;kwargs...) = single_doublelayer_dim(args...;kwargs...)[2]
+function combinedfield_dim(pde,X,Y;α,β,compress,location)
+    Cop = CombinedFieldOperator(pde,X,Y;α,β)
+    # convert to a possibly more efficient format
+    @timeit_debug "assemble combined field dense part" begin
+        C = compress(Cop)
+    end
+    _,_,δS,δD = _single_doublelayer_dim(pde,X,Y;compress,location)
+    # convert to DiscreteOp
+    return DiscreteOp(C) + DiscreteOp(α*δD-β*δS)
+end
 
-function adjointdoublelayer_hypersingular_dim(pde,X,Y=X;compress=Matrix,location=:onsurface)
+function _adjointdoublelayer_hypersingular_dim(pde,X,Y=X;compress=Matrix,location=:onsurface)
     msg = "unrecognized value for kw `location`: received $location.
     Valid options are `:onsurface`, `:inside` and `:outside`."
     σ = location === :onsurface ? -0.5 : location === :inside ? -1 : location === :outside ? 0 : error(msg)
@@ -61,14 +81,28 @@ function adjointdoublelayer_hypersingular_dim(pde,X,Y=X;compress=Matrix,location
     basis,γ₁_basis = _basis_dim(Kop)
     γ₀B,γ₁B,R      = _auxiliary_quantities_dim(Kop,K,H,basis,γ₁_basis,σ)
     # compute corrections
-    δK,δH        = _singular_weights_dim(Kop,Hop,γ₀B,γ₁B,R,dict_near)
+    δK,δH = _singular_weights_dim(Kop,Hop,γ₀B,γ₁B,R,dict_near)
+    return K,H,δK,δH
+end
+function adjointdoublelayer_hypersingular_dim(args...;kwargs...)
+    K,H,δK,δH = _adjointdoublelayer_hypersingular_dim(args...;kwargs...)
     # convert to DiscreteOp
-    K_discrete = DiscreteOp(K) + DiscreteOp(δK)
-    H_discrete = DiscreteOp(H) + DiscreteOp(δH)
-    return K_discrete,H_discrete
+    Kd = DiscreteOp(K) + DiscreteOp(δK)
+    Hd = DiscreteOp(H) + DiscreteOp(δH)
+    return Kd,Hd
 end
 adjointdoublelayer_dim(args...;kwargs...)  = adjointdoublelayer_hypersingular_dim(args...;kwargs...)[1]
 hypersingular_dim(args...;kwargs...)       = adjointdoublelayer_hypersingular_dim(args...;kwargs...)[2]
+function adjointcombinedfield_dim(pde,X,Y;α,β,compress,location)
+    Cop = AdjointCombinedFieldOperator(pde,X,Y;α,β)
+    # convert to a possibly more efficient format
+    @timeit_debug "assemble adjoint combined field dense part" begin
+        C = compress(Cop)
+    end
+    _,_,δK,δH = _adjointdoublelayer_hypersingular_dim(pde,X,Y;compress,location)
+    # convert to DiscreteOp
+    return DiscreteOp(C) + DiscreteOp(α*δH-β*δK)
+end
 
 function _auxiliary_quantities_dim(iop,Op0,Op1,basis,γ₁_basis,σ)
     T   = eltype(iop)
@@ -194,8 +228,8 @@ end
 function _singular_weights_dim(op1::IntegralOperator,op2::IntegralOperator,γ₀B,γ₁B,R,dict_near)
     # initialize vectors for the sparse matrix, then dispatch to type-stable
     # method for each element type
-    @assert (kernel(op1) isa SingleLayerKernel && kernel(op2) isa DoubleLayerKernel) ||
-            (kernel(op1) isa AdjointDoubleLayerKernel && kernel(op2) isa HyperSingularKernel)
+    @assert (kernel_type(op1) isa SingleLayer && kernel_type(op2) isa DoubleLayer) ||
+            (kernel_type(op1) isa AdjointDoubleLayer && kernel_type(op2) isa HyperSingular)
     Y  = source_surface(op1)
     T  = eltype(op1)
     sizeop = size(op1)
