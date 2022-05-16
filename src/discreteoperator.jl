@@ -37,7 +37,8 @@ materialize(d::AbstractDiscreteOp) = abstractmethod(d)
 _materialize(d::AbstractDiscreteOp,x) = materialize(d)*x
 
 _check_dim_mul(A,B) = @assert(size(A,2) == size(B,1))
-_check_dim_mul(A,B::Density{V}) where {V<:SVector} = @assert(size(A,2) == size(B,1)*length(V))
+_check_dim_mul(A::Matrix{<:Number},B::Density{V}) where {V<:SVector} = @assert(size(A,2)==size(B,1)*length(V))
+
 _check_dim_sum(A,B) = @assert(size(A) == size(B))
 
 ############
@@ -57,8 +58,7 @@ function LinearAlgebra.mul!(y::Vector{<:SVector},d::UniformScalingDiscreteOp,x::
     # LinearAlgebra.mul!(y::Vector{<:SVector},
     #                    d::Union{Number,UniformScaling},
     #                    x::Vector{<:SVector},
-    #                    a,
-    #                    b)
+    #                    a,b)
     # That's why this function is needed.
     @. y = a*d.λ*x + b*y
     return y
@@ -88,35 +88,11 @@ struct DiscreteOp{D} <: AbstractDiscreteOp
 end
 DiscreteOp(d::AbstractDiscreteOp) = d
 Base.size(d::DiscreteOp) = size(d.op)
-Base.:*(d::DiscreteOp,x::AbstractVecOrMat) = d.op*x
+Base.:*(d::DiscreteOp,x::AbstractVecOrMat) = _mymul(d.op,x)
 materialize(d::DiscreteOp) = d.op
 
 function LinearAlgebra.mul!(y,d::DiscreteOp,x,a,b)
     return _mymul!(y,materialize(d),x,a,b)
-end
-
-# `_mymul!` patches a bug that
-# occurs when the following function is called:
-# LinearAlgebra.mul!(y::Vector{<:SVector},
-#                    A::Matrix{<:SMatrix},
-#                    x::Vector{<:SVector},
-#                    a,b)
-_mymul!(y,A,x,a,b) = mul!(y,A,x,a,b)
-function _mymul!(y::Vector{T},
-                 A::Matrix{<:SMatrix},
-                 x::Vector{<:SVector},a,b) where {T<:SVector}
-    # y.=a*A*x+b*y
-    # implement a hand-written loop
-    @assert size(A) == (length(y),length(x))
-    ytemp = zero(T)
-    for i in 1:size(A,1)
-        ytemp = zero(T)
-        for j in 1:size(A,2)
-            ytemp += A[i,j]*x[j]
-        end
-        y[i] = a*ytemp + b*y[i]
-    end
-    return y
 end
          
 ############
@@ -179,14 +155,6 @@ function _materialize(d::CompositeDiscreteOp, x)
     end
     return _materialize(CompositeDiscreteOp(d.maps[1:end-1]), y)
 end
-
-# `_mymul` patches a bug that
-# occurs when a Diagonal{<:SMatrix}
-# is multiplied by a Matrix{<:SMatrix}
-# with SMatrices of different sizes
-_mymul(A,B)                                         = A*B
-_mymul(A::Diagonal{<:SMatrix},B::Matrix{<:SMatrix}) = A.diag.*B
-_mymul(A::Matrix{<:SMatrix},B::Diagonal{<:SMatrix}) = A.*permutedims(B.diag)
 
 ############
 # LinearCombinationDiscreteOp

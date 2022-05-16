@@ -55,14 +55,14 @@ function LinearAlgebra.mul!(y::Density{<:Number},
                             A::AbstractMatrix{<:Number},
                             x::Density{<:Number},
                             a::Number,b::Number)
-    mul!(vals(y),A,vals(x),a,b)
+    _mymul!(vals(y),A,vals(x),a,b)
     return y
 end
 function LinearAlgebra.mul!(y::Density{<:SVector},
-                            A::AbstractMatrix{<:SMatrix},
+                            A::AbstractMatrixOrDiagonal{<:SMatrix},
                             x::Density{<:SVector},
                             a::Number,b::Number)
-    mul!(vals(y),A,vals(x),a,b)
+    _mymul!(vals(y),A,vals(x),a,b)
     return y
 end
 function LinearAlgebra.mul!(y::Density{<:SVector},
@@ -72,7 +72,7 @@ function LinearAlgebra.mul!(y::Density{<:SVector},
     
     yvals = reinterpret(eltype(eltype(y)),vals(y))
     xvals = reinterpret(eltype(eltype(y)),vals(x))
-    mul!(yvals,A,xvals,a,b)
+    _mymul!(yvals,A,xvals,a,b)
     return y
 end
 
@@ -82,14 +82,15 @@ function Base.:*(A::AbstractMatrix{<:Number},x::Density{<:Number})
     y = similar(x)
     return mul!(y,A,x)
 end
-function Base.:*(A::AbstractMatrix{<:SMatrix},x::Density{<:SVector})
+function Base.:*(A::AbstractMatrixOrDiagonal{<:SMatrix},x::Density{<:SVector})
     # assume `y::Density` with same length as `x`
     @assert size(A,1) == size(A,2)
     T = Base.promote_op(*, eltype(A), eltype(x))
     y = Density(zeros(T,length(x)),mesh(x))
     return mul!(y,A,x)
 end
-function Base.:*(A::AbstractMatrix{<:Number},x::Density{<:SVector})
+function Base.:*(A::AbstractMatrix{<:Number},
+                 x::Density{<:SVector})
     # Infer the resulting Density eltype
     V = eltype(x)
     nqnodes,res = divrem(size(A,2),length(V)) # number of qnodes
