@@ -49,3 +49,21 @@ function blockdiag_preconditioner(dop::Nystrom.LinearCombinationDiscreteOp)
     end
     return blockdiag
 end
+
+###
+# Helmholtz CFIE Regularizer
+###
+
+function helmholtz_regularizer(pde::Maxwell, nmesh; δ=1/2, kwargs...)
+    k = Nystrom.parameters(pde)
+    k_helmholtz = im*k*δ
+    pdeHelmholtz = Nystrom.Helmholtz(;dim=3,k=k_helmholtz)
+    S,_ = Nystrom.single_doublelayer_dim(pdeHelmholtz,nmesh;kwargs...)
+    # TODO: implement efficient version without
+    # assembling the full matrix
+    Smat = Nystrom.materialize(S)
+    T = Nystrom.default_kernel_eltype(pde)
+    diagI = spdiagm([one(T) for _ in 1:size(Smat,1)])
+    R = (Smat*diagI) |> Nystrom.blockmatrix_to_matrix |> Nystrom.DiscreteOp 
+    return R
+end
