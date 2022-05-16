@@ -3,6 +3,7 @@ module MaxwellDIM
 using StaticArrays
 using LinearAlgebra
 using Nystrom
+using SparseArrays
 
 export 
     # types
@@ -13,7 +14,7 @@ export
     EFIEOperator,
     MFIEOperator
 
-include("kernel.jl")
+include("kernels.jl")
 include("dim.jl")
 
 end
