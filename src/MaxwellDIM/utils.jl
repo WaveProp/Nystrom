@@ -37,26 +37,58 @@ function blockdiag(d::Nystrom.LinearCombinationDiscreteOp;
                    iop::Union{Nothing,MaxwellOperator}=nothing)
     # Check that `d` has the following form:
     # d.maps[1]: uncorrected integral operator
-    # d.maps[2]: sparse correction
+    # d.maps[2]: DIM sparse correction
     @assert length(d.maps) == 2
-    C₀ = Nystrom.materialize(d.maps[1])  # uncorrected integral operator
-    C₁ = Nystrom.materialize(d.maps[2])  # sparse correction
-    @assert C₁ isa SparseMatrixCSC{<:Number}
+    C₀,C₁ = d.maps
+    @assert C₀ isa Nystrom.AbstractDiscreteOp
+    @assert C₁ isa Nystrom.DiscreteOp{<:SparseMatrixCSC{<:Number}}
     bd = _blockdiag(C₀,C₁;iop)
     return bd
 end
-function _blockdiag(C₀::Matrix{<:Number},C₁;iop)
-    # the sparse correction needs to be corrected
+function _blockdiag(C₀,C₁;iop)
+    # TODO: implement with threads
+    # General case:
+    # the DIM sparse correction needs to be corrected
+    # with the integral operator `iop`
+    @assert !isnothing(iop) "you must provide an `iop::MaxwellOperator`."
+    C₁m::SparseMatrixCSC{<:Number} = Nystrom.materialize(C₁)
+    nqnodes  = size(C₁m,1) ÷ 3            # 3 scalar entries per qnode
+    # compute size and number of blocks in the diagonal
+    Nsize   = length(nzrange(C₁m,1)) ÷ 3  # 3 scalar entries per qnode
+    Nblocks = nqnodes ÷ Nsize
+    # construct correction
+    T = SMatrix{3,3,ComplexF64,9}
+    bd_block = Nystrom.BlockSparseConstructor(T,nqnodes,nqnodes)
+    for n in 0:(Nblocks-1)
+        for j in 1:Nsize
+            for i in 1:Nsize
+                index_i = n*Nsize+i
+                index_j = n*Nsize+j
+                val     = iop[index_i,index_j]
+                Nystrom.addentry!(bd_block,index_i,index_j,val)
+            end
+        end
+    end
+    # convert to `SparseMatrixCSC`
+    # and add DIM sparse correction
+    bd = sparse(bd_block)
+    axpy!(true,C₁m,bd)  # bd += C₁m
+    return bd
+end
+function _blockdiag(C₀::Nystrom.DiscreteOp{<:Matrix{<:Number}},C₁;iop)
+    # the DIM sparse correction needs to be corrected
     # with the uncorrected integral operator `C₀`
-    bd = deepcopy(C₁)    # block diagonal preconditioner
-    rows = rowvals(bd)
-    vals = nonzeros(bd)
+    C₀m::Matrix{<:Number}          = Nystrom.materialize(C₀)
+    C₁m::SparseMatrixCSC{<:Number} = Nystrom.materialize(C₁)
+    bd    = deepcopy(C₁m)    # block diagonal preconditioner
+    rows  = rowvals(bd)
+    vals  = nonzeros(bd)
     ncols = size(bd,2)   # number of columns
     Threads.@threads for j in 1:ncols
         for index in nzrange(bd, j)
             i = rows[index]  # row index
             # update value in blockdiag
-            vals[index] += C₀[i,j]
+            vals[index] += C₀m[i,j]
         end
     end
     return bd
