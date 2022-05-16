@@ -8,12 +8,14 @@ struct Density{V,S<:NystromMesh} <: AbstractVector{V}
     mesh::S
 end
 
+# AbstractArray interface
+Base.size(σ::Density,args...)      = size(σ.vals,args...)
+Base.getindex(σ::Density,args...)  = getindex(σ.vals,args...)
+Base.setindex!(σ::Density,args...) = setindex!(σ.vals,args...)
+Base.similar(σ::Density)           = Density(similar(σ.vals),mesh(σ))
+
 vals(σ::Density) = σ.vals
 mesh(σ::Density) = σ.mesh
-
-Base.size(σ::Density,args...)     = size(σ.vals,args...)
-Base.getindex(σ::Density,args...) = getindex(σ.vals,args...)
-Base.setindex(σ::Density,args...) = setindex(σ.vals,args...)
 
 Density(etype::DataType,surf)  = Density(zeros(etype,length(dofs(surf))),surf)
 Density(pde::AbstractPDE,surf) = Density(default_density_eltype(pde),surf)
@@ -30,8 +32,6 @@ end
 function γ₁(f,X)
     Density(dof->f(coords(dof),normal(dof)),X)
 end
-
-Base.zero(σ::Density) = Density(zero(σ.vals),mesh(σ))
 
 # overload some unary/binary operations for convenience
 Base.:-(σ::Density) = Density(-σ.vals,σ.mesh)
@@ -118,7 +118,7 @@ mesh(σ::TangentialDensity) = σ.mesh
 
 Base.size(σ::TangentialDensity,args...)     = size(σ.vals,args...)
 Base.getindex(σ::TangentialDensity,args...) = getindex(σ.vals,args...)
-Base.setindex(σ::TangentialDensity,args...) = setindex(σ.vals,args...)
+Base.setindex!(σ::TangentialDensity,args...) = setindex!(σ.vals,args...)
 
 function TangentialDensity(σ::Density)
     # original density type must be a 3D vector
