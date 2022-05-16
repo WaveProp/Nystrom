@@ -42,12 +42,16 @@ Base.:/(σ::Density,a::Number) = Density(σ.vals/a,σ.mesh)
 
 Base.:*(A::AbstractMatrix{<:Number},σ::Density{<:Number}) = Density(A*σ.vals,σ.mesh)
 function Base.:*(A::AbstractMatrix{<:Number},σ::Density{V}) where {V<:SVector}
+    # FIX: this is a bit hacky
     σvec = reinterpret(eltype(V),σ.vals)
-    @assert size(A,2) % length(V) == 0
-    μlen,res = divrem(size(A,1),length(V))
-    @assert res == 0
-    μ = Density(zeros(V,μlen),σ.mesh)
-    μvec = reinterpret(eltype(V),μ.vals)
+    nqnodes,res2 = divrem(size(A,2),length(V)) # number of qnodes
+    @assert nqnodes == length(σ)
+    @assert iszero(res2)
+    lengthT,res1 = divrem(size(A,1),nqnodes)
+    @assert iszero(res1)
+    T = SVector{lengthT,eltype(V)}  # new Density eltype
+    μ = Density(zeros(T,nqnodes),σ.mesh)
+    μvec = reinterpret(eltype(T),μ.vals)
     mul!(μvec,A,σvec)
     return μ
 end

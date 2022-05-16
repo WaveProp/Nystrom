@@ -46,13 +46,14 @@ Random.seed!(1)
     @test eltype(σ) == SVector{3,Float64}
     @test zero(σ) == Density(SVector{3,Float64},mesh)
 
-    n = 10
-    V = Nystrom.default_kernel_eltype(pde)
-    Amat = rand(eltype(T),(n,length(Nystrom.dofs(mesh))).*size(V))
+    nqnodes = length(Nystrom.dofs(mesh))
+    lengthV = 2
+    lengthT = length(T)
+    Amat = rand(eltype(T),(nqnodes,nqnodes).*(lengthV,lengthT))
     μ = Amat*σ
     @test μ isa Density
-    @test eltype(μ) == T
-    @test length(μ) == n
+    @test eltype(μ) == SVector{lengthV,eltype(T)}
+    @test length(μ) == nqnodes
 
     @testset "TangentialDensity test" begin
         tan_σ = TangentialDensity(σ)

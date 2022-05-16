@@ -4,7 +4,7 @@ function diagonal_ncross_and_jacobian_matrices(nmesh)
     # construct diagonal matrices as sparse arrays using BlockSparseConstructor
     Tn = qnodes |> first |> Nystrom.normal |> Nystrom.cross_product_matrix |> typeof
     Tj = qnodes |> first |> Nystrom.jacobian |> typeof
-    Td = SMatrix{2,3,Float64,6}  # TODO: remove harcoded type
+    Td = qnodes |> first |> Nystrom.jacobian |> pinv |> typeof
     nblock = Nystrom.BlockSparseConstructor(Tn,n_qnodes,n_qnodes)
     jblock = Nystrom.BlockSparseConstructor(Tj,n_qnodes,n_qnodes)
     dblock = Nystrom.BlockSparseConstructor(Td,n_qnodes,n_qnodes)
