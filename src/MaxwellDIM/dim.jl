@@ -38,12 +38,8 @@ function _maxwell_auxiliary_quantities_dim(iop,T,K,basis,γ₁_basis,σ)
     ynodes = Nystrom.dofs(Y)
     γ₀B,γ₀B_block = Nystrom.MatrixAndBlockIndexer(V,length(ynodes),num_basis)
     γ₁B,γ₁B_block = Nystrom.MatrixAndBlockIndexer(V,length(ynodes),num_basis)
-    Threads.@threads for i in 1:length(ynodes)
-        for k in 1:num_basis
-            γ₀B_block[i,k] = basis[k](ynodes[i])
-            γ₁B_block[i,k] = γ₁_basis[k](ynodes[i])
-        end
-    end
+    # fill auxiliary matrices
+    _maxwell_auxiliary_quantities_dim!(γ₀B_block,γ₁B_block,basis,γ₁_basis,ynodes,num_basis)
     # integrate the basis over Y
     xnodes      = Nystrom.dofs(X)
     num_targets = length(xnodes)
@@ -62,6 +58,14 @@ function _maxwell_auxiliary_quantities_dim(iop,T,K,basis,γ₁_basis,σ)
         end
     end
     return γ₀B, γ₁B, R
+end
+function _maxwell_auxiliary_quantities_dim!(γ₀B_block,γ₁B_block,basis,γ₁_basis,ynodes,num_basis)
+    Threads.@threads for i in 1:length(ynodes)
+        for k in 1:num_basis
+            γ₀B_block[i,k] = basis[k](ynodes[i])
+            γ₁B_block[i,k] = γ₁_basis[k](ynodes[i])
+        end
+    end
 end
 
 function _maxwell_singular_weights_dim(Top,γ₀B,γ₁B,R,dict_near)
