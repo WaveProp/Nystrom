@@ -3,6 +3,7 @@ using LinearAlgebra
 using Nystrom
 using Nystrom.MaxwellDIM
 using StaticArrays
+using Nystrom.SparseArrays
 
 @testset "Stratton-Chu" begin
     rtol=5e-2
@@ -30,5 +31,28 @@ using StaticArrays
     e1 = error_strattonchu(Tdim,Kdim)
     @test norm(e0,Inf) > norm(e1,Inf)
     @test norm(e1,Inf) < rtol
+end
+
+@testset "Block diagonal preconditioner" begin
+    Geometry.clear_entities!()
+    Ω   = ParametricSurfaces.Sphere(;radius=3) |> Geometry.Domain
+    Γ   = boundary(Ω)
+    M   = ParametricSurfaces.meshgen(Γ,(2,2))
+    mesh = NystromMesh(view(M,Γ),order=2)
+    pde = Maxwell(;k=1)
+
+    _,K = MaxwellDIM.maxwell_dim(pde,mesh)  # MFIE
+    Kmat = Nystrom.materialize(K)
+
+    # check that precondicioner is equal to operator
+    # on the block diagonal
+    Kprecon = MaxwellDIM.blockdiag_preconditioner(K)
+    I,J,V = findnz(Kprecon)
+    passtest = true
+    for (i,j,v) in zip(I,J,V)
+        passtest &= (Kmat[i,j] == v)
+        passtest || break
+    end
+    @test passtest
 end
 

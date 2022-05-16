@@ -102,35 +102,3 @@ end
 
 EFIEOperator(op::Maxwell,X,Y=X) = Nystrom.IntegralOperator(EFIEKernel(op), X, Y)
 MFIEOperator(op::Maxwell,X,Y=X) = Nystrom.IntegralOperator(MFIEKernel(op), X, Y)
-
-###
-# Extras
-###
-function diagonal_ncross_and_jacobian_matrices(nmesh)
-    qnodes = Nystrom.dofs(nmesh)
-    n_qnodes = length(qnodes)
-    # construct diagonal matrices as sparse arrays using BlockSparseConstructor
-    Tn = qnodes |> first |> Nystrom.normal |> Nystrom.cross_product_matrix |> typeof
-    Tj = qnodes |> first |> Nystrom.jacobian |> typeof
-    Td = SMatrix{2,3,Float64,6}  # TODO: remove harcoded type
-    nblock = Nystrom.BlockSparseConstructor(Tn,n_qnodes,n_qnodes)
-    jblock = Nystrom.BlockSparseConstructor(Tj,n_qnodes,n_qnodes)
-    dblock = Nystrom.BlockSparseConstructor(Td,n_qnodes,n_qnodes)
-    for i in 1:n_qnodes
-        q = qnodes[i]
-        n = Nystrom.cross_product_matrix(normal(q))
-        j = Nystrom.jacobian(q)
-        d = Td(pinv(j))
-        Nystrom.addentry!(nblock,i,i,n)
-        Nystrom.addentry!(jblock,i,i,j)
-        Nystrom.addentry!(dblock,i,i,d)
-    end
-    return sparse(nblock), sparse(jblock), sparse(dblock)
-end
-diagonal_ncross_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[1]
-diagonal_jacobian_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[2]
-diagonal_dualjacobian_matrix(nmesh) = diagonal_ncross_and_jacobian_matrices(nmesh)[3]
-
-
-
-

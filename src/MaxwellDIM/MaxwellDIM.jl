@@ -17,5 +17,6 @@ export
 
 include("kernels.jl")
 include("dim.jl")
+include("utils.jl")
 
 end

@@ -18,7 +18,7 @@ ndofs = []
 ee = []
 
 npatches = [2,4,8]
-qorder   =  2
+qorder   =  3
 for n in npatches
     ## generate mesh
     Geometry.clear_entities!()
