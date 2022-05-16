@@ -18,8 +18,8 @@ export
     ifgf_compressor
 
 include("kernels.jl")
+include("ifgf.jl")
 include("dim.jl")
 include("utils.jl")
-include("ifgf.jl")
 
 end

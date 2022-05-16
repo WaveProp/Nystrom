@@ -29,10 +29,6 @@ WavePropBase.@import_interface
 import IFGF
 
 export
-    # Gmsh related stuff
-    GmshSDK,
-    @gmsh,
-    gmsh,
     # re-export useful stuff
     Geometry,
     ParametricSurfaces,
@@ -80,7 +76,7 @@ include("gausskronrod.jl")
 include("discreteoperator.jl")
 # include("ifgf.jl")
 
-# module that extends the DIM method to Maxwell equation
+# module that extends the DIM method to the Maxwell's equations
 include("MaxwellDIM/MaxwellDIM.jl")
 
 end # module
