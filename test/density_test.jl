@@ -6,6 +6,7 @@ using LinearAlgebra
 Random.seed!(1)
 
 @testset "Density test" begin
+    # Scalar case
     Geometry.clear_entities!()
     pde   = Helmholtz(;dim=3,k=1)
     Ω     = ParametricSurfaces.Sphere()
@@ -19,9 +20,15 @@ Random.seed!(1)
         exp(im*2*norm(x))
     end
     @test eltype(σ) == ComplexF64
-end
 
-@testset "TangentialDensity test" begin
+    n = 10
+    Amat = rand(ComplexF64,n,length(Nystrom.dofs(mesh)))
+    μ = Amat*σ
+    @test μ isa Density
+    @test eltype(μ) == ComplexF64
+    @test length(μ) == n
+
+    # Tensor case
     Geometry.clear_entities!()
     Ω   = ParametricSurfaces.Sphere(;radius=1) |> Geometry.Domain
     Γ   = boundary(Ω)
@@ -31,16 +38,26 @@ end
     T = Nystrom.default_density_eltype(pde)
     xout = SVector(3,3,3)
     c = rand(T)
-
     σ = Density(mesh) do target  # density defined with a tangential field
         x = coords(target)
         cross(normal(target), SingleLayerKernel(pde)(xout,target)*c)
     end
-    tan_σ = TangentialDensity(σ)
-    @test Density(tan_σ) ≈ σ
+    @test eltype(σ) == SVector{3,Float64}
 
-    ncross_σ = ncross(σ)
-    ncross_tan_σ = ncross(tan_σ)
-    @test TangentialDensity(ncross_σ) ≈ ncross_tan_σ
-    @test Density(ncross_tan_σ) ≈ ncross_σ
+    n = 10
+    V = Nystrom.default_kernel_eltype(pde)
+    Amat = rand(eltype(T),(n,length(Nystrom.dofs(mesh))).*size(V))
+    μ = Amat*σ
+    @test μ isa Density
+    @test eltype(μ) == T
+    @test length(μ) == n
+
+    @testset "TangentialDensity test" begin
+        tan_σ = TangentialDensity(σ)
+        @test Density(tan_σ) ≈ σ
+        ncross_σ = ncross(σ)
+        ncross_tan_σ = ncross(tan_σ)
+        @test TangentialDensity(ncross_σ) ≈ ncross_tan_σ
+        @test Density(ncross_tan_σ) ≈ ncross_σ
+    end
 end
