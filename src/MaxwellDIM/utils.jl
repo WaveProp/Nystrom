@@ -107,6 +107,18 @@ function _blockdiag(C₀::Nystrom.DiscreteOp{<:Matrix{<:Number}},C₁;iop)
     return bd
 end
 
+function blockdiag(nmesh::Nystrom.NystromMesh,L::Matrix{<:ComplexF64})
+    # Check that `nmesh` only contains one type of element
+    @assert nmesh.elt2dof|>values|>length == 1
+    qnodes_per_element = size(nmesh.elt2dof|>values|>first,1)
+    Nblocksize = 3 * qnodes_per_element  # 3 dofs per qnode
+    Nblocks    = size(L,1) / Nblocksize  # number of blocks
+    # TODO: implement a more eficient version
+    block = sparse(ones(Bool,Nblocksize,Nblocksize))
+    mask = SparseArrays.blockdiag((block for _ in 1:Nblocks)...)
+    return mask .* L
+end
+
 ###
 # Helmholtz CFIE Regularizer
 ###

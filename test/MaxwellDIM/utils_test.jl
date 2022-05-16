@@ -10,12 +10,14 @@ using Nystrom.MaxwellDIM
     Ω   = ParametricSurfaces.Sphere(;radius=3) |> Geometry.Domain
     Γ   = boundary(Ω)
     M   = ParametricSurfaces.meshgen(Γ,(2,2))
-    mesh = NystromMesh(view(M,Γ),order=2)
+    qnumber = 3   # per dimension per patch
+    qorder = qnumber-1   # quadrature order (Fejer)
+    nmesh = NystromMesh(view(M,Γ),order=qorder)
     k = 1
     pde = Maxwell(;k)
 
     @testset "Block diagonal preconditioner" begin
-        _,K = MaxwellDIM.maxwell_dim(pde,mesh)  # MFIE
+        _,K = MaxwellDIM.maxwell_dim(pde,nmesh)  # MFIE
         Kmat = Nystrom.materialize(K)
         # check that precondicioner is equal to operator
         # on the block diagonal
@@ -27,6 +29,7 @@ using Nystrom.MaxwellDIM
             passtest || break
         end
         @test passtest
+        @test Kprecon == MaxwellDIM.blockdiag(nmesh,Kmat)
     end
 
     @testset "Scalar2VectorOp test" begin
@@ -48,15 +51,15 @@ using Nystrom.MaxwellDIM
 
     @testset "Helmholtz regularizer" begin
         δ=1/2
-        R = MaxwellDIM.helmholtz_regularizer(pde, mesh; δ)
+        R = MaxwellDIM.helmholtz_regularizer(pde, nmesh; δ)
         k_helmholtz = im*k*δ
         pdeHelmholtz = Helmholtz(;dim=3,k=k_helmholtz)
-        S,_ = Nystrom.single_doublelayer_dim(pdeHelmholtz,mesh)
-        σ = rand(SVector{3,ComplexF64},length(Nystrom.dofs(mesh)))
+        S,_ = Nystrom.single_doublelayer_dim(pdeHelmholtz,nmesh)
+        σ = rand(SVector{3,ComplexF64},length(Nystrom.dofs(nmesh)))
         y = S*σ
         w = deepcopy(y)
 
-        σd = Nystrom.Density(σ,mesh)
+        σd = Nystrom.Density(σ,nmesh)
         @test R*σd ≈ R*σ ≈ mul!(w,R,σ) ≈ y
     end
 end
