@@ -22,19 +22,20 @@ Random.seed!(1)
     @test eltype(σ) == ComplexF64
     @test zero(σ) == Density(ComplexF64,mesh)
 
-    n = 10
-    Amat = rand(ComplexF64,n,length(Nystrom.dofs(mesh)))
+    ndof = length(Nystrom.dofs(mesh))
+    Amat = rand(ComplexF64,ndof,ndof)
     μ = Amat*σ
     @test μ isa Density
     @test eltype(μ) == ComplexF64
-    @test length(μ) == n
+    @test length(μ) == ndof
 
-    # Tensor case
+    # Tensor Case
     Geometry.clear_entities!()
     Ω   = ParametricSurfaces.Sphere(;radius=1) |> Geometry.Domain
     Γ   = boundary(Ω)
     M   = ParametricSurfaces.meshgen(Γ,(2,2))
     mesh = NystromMesh(view(M,Γ),order=2)
+    nqnodes = length(Nystrom.dofs(mesh))
     pde = Elastostatic(;dim=3,μ=2,λ=3)
     T = Nystrom.default_density_eltype(pde)
     xout = SVector(3,3,3)
@@ -46,7 +47,13 @@ Random.seed!(1)
     @test eltype(σ) == SVector{3,Float64}
     @test zero(σ) == Density(SVector{3,Float64},mesh)
 
-    nqnodes = length(Nystrom.dofs(mesh))
+    A = rand(SMatrix{2,3,Float64,6},nqnodes,nqnodes)
+    μ = A*σ
+    @test μ isa Density
+    @test eltype(μ) == SVector{2,eltype(T)}
+    @test length(μ) == nqnodes
+
+    # Scalar and Tensor case
     lengthV = 2
     lengthT = length(T)
     Amat = rand(eltype(T),(nqnodes,nqnodes).*(lengthV,lengthT))

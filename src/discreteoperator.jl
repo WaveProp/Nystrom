@@ -24,6 +24,7 @@ Base.:*(d::AbstractDiscreteOp,_) = abstractmethod(d)
 Base.:*(_,d::AbstractDiscreteOp) = abstractmethod(d)
 Base.size(d::AbstractDiscreteOp) = abstractmethod(d)
 Base.size(d::AbstractDiscreteOp,i::Integer) = size(d)[i]
+LinearAlgebra.mul!(y,d::AbstractDiscreteOp,x,a,b) = abstractmethod(d)
 
 """
     materialize(d::AbstractDiscreteOp)
@@ -48,6 +49,20 @@ struct UniformScalingDiscreteOp{T<:Number} <: AbstractDiscreteOp
 end
 Base.size(d::UniformScalingDiscreteOp) = (d.s,d.s)
 
+function LinearAlgebra.mul!(y,d::UniformScalingDiscreteOp,x,a,b)
+    return mul!(y,materialize(d),x,a,b)
+end
+function LinearAlgebra.mul!(y::Vector{<:SVector},d::UniformScalingDiscreteOp,x::Vector{<:SVector},a,b)
+    # Currently, Julia (v1.7.1) doesn't support
+    # LinearAlgebra.mul!(y::Vector{<:SVector},
+    #                    d::Union{Number,UniformScaling},
+    #                    x::Vector{<:SVector},
+    #                    a,
+    #                    b)
+    # That's why this function is needed.
+    @. y = a*d.λ*x + b*y
+    return y
+end
 function Base.:*(d::UniformScalingDiscreteOp,x::AbstractVecOrMat) 
     _check_dim_mul(d,x)
     return d.λ*x
@@ -76,6 +91,34 @@ Base.size(d::DiscreteOp) = size(d.op)
 Base.:*(d::DiscreteOp,x::AbstractVecOrMat) = d.op*x
 materialize(d::DiscreteOp) = d.op
 
+function LinearAlgebra.mul!(y,d::DiscreteOp,x,a,b)
+    return _mymul!(y,materialize(d),x,a,b)
+end
+
+# `_mymul!` patches a bug that
+# occurs when the following function is called:
+# LinearAlgebra.mul!(y::Vector{<:SVector},
+#                    A::Matrix{<:SMatrix},
+#                    x::Vector{<:SVector},
+#                    a,b)
+_mymul!(y,A,x,a,b) = mul!(y,A,x,a,b)
+function _mymul!(y::Vector{T},
+                 A::Matrix{<:SMatrix},
+                 x::Vector{<:SVector},a,b) where {T<:SVector}
+    # y.=a*A*x+b*y
+    # implement a hand-written loop
+    @assert size(A) == (length(y),length(x))
+    ytemp = zero(T)
+    for i in 1:size(A,1)
+        ytemp = zero(T)
+        for j in 1:size(A,2)
+            ytemp += A[i,j]*x[j]
+        end
+        y[i] = a*ytemp + b*y[i]
+    end
+    return y
+end
+         
 ############
 # CompositeDiscreteOp
 ############
@@ -93,6 +136,13 @@ CompositeDiscreteOp(d1::CompositeDiscreteOp, d2::CompositeDiscreteOp) = Composit
 
 Base.size(d::CompositeDiscreteOp) = (size(first(d.maps),1), size(last(d.maps),2))
 
+function LinearAlgebra.mul!(z,d::CompositeDiscreteOp,x,a,b)
+    _check_dim_mul(d,x)
+    # evaluate product from right to left
+    y = last(d.maps)*x
+    length(d.maps) == 2 && return mul!(z,first(d.maps),y,a,b)
+    return mul!(z,CompositeDiscreteOp(d.maps[1:end-1]),y,a,b)
+end
 function Base.:*(d::CompositeDiscreteOp,x::AbstractVecOrMat) 
     _check_dim_mul(d,x)
     # evaluate product from right to left
@@ -129,19 +179,14 @@ function _materialize(d::CompositeDiscreteOp, x)
     end
     return _materialize(CompositeDiscreteOp(d.maps[1:end-1]), y)
 end
-function _mymul(A, B)
-    # this function patches a bug that
-    # occurs when a Diagonal{<:SMatrix}
-    # is multiplied by a Matrix{<:SMatrix}
-    # with SMatrices of different sizes
-    if A isa Diagonal{<:SMatrix} && B isa Matrix{<:SMatrix}
-        return A.diag.*B
-    elseif A isa Matrix{<:SMatrix} && B isa Diagonal{<:SMatrix}
-        return A.*permutedims(B.diag)
-    else
-        return A*B
-    end
-end
+
+# `_mymul` patches a bug that
+# occurs when a Diagonal{<:SMatrix}
+# is multiplied by a Matrix{<:SMatrix}
+# with SMatrices of different sizes
+_mymul(A,B)                                         = A*B
+_mymul(A::Diagonal{<:SMatrix},B::Matrix{<:SMatrix}) = A.diag.*B
+_mymul(A::Matrix{<:SMatrix},B::Diagonal{<:SMatrix}) = A.*permutedims(B.diag)
 
 ############
 # LinearCombinationDiscreteOp
@@ -160,13 +205,20 @@ LinearCombinationDiscreteOp(d1::LinearCombinationDiscreteOp, d2::LinearCombinati
 
 Base.size(d::LinearCombinationDiscreteOp) = size(first(d.maps))
 
+function LinearAlgebra.mul!(y,d::LinearCombinationDiscreteOp,x,a,b)
+    _check_dim_mul(d,x)
+    lmul!(b,y)  # y .= b*y 
+    for n in 1:length(d.maps)
+        mul!(y,d.maps[n],x,a,true)  # y .+= a*d.maps[n]*x
+    end
+    return y
+end
 function Base.:*(d::LinearCombinationDiscreteOp,x::AbstractVecOrMat) 
     _check_dim_mul(d,x)
     # evaluate product from left to right
     y = first(d.maps)*x
     for n in 2:length(d.maps)
-        # TODO: use mul! instead
-        y += d.maps[n]*x
+        mul!(y,d.maps[n],x,true,true)  # y += d.maps[n]*x
     end
     return y
 end

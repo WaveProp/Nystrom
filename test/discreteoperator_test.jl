@@ -10,19 +10,33 @@ Random.seed!(1)
     T1 = SMatrix{3,3,ComplexF64,9}
     T2 = SMatrix{2,3,ComplexF64,6}
 
-    A = rand(T1, 5, 5)
-    B = rand(T1, 5, 5)
-    C = rand(T2, 5, 5)
-    x = rand(T, 5)
-    α = rand(ComplexF64)
+    a,b = randn(2)
+    n = 5
+    A = randn(T1,n,n)
+    B = randn(T1,n,n)
+    C = randn(T2,n,n)
+    x = randn(T,n)
+    α = randn(ComplexF64)
     Aop = Nystrom.DiscreteOp(A)
     Bop = Nystrom.DiscreteOp(B)
     Cop = Nystrom.DiscreteOp(C)
+
+    @testset "UniformScalingDiscreteOp test" begin
+        λ = -3.5
+        Uop = Nystrom.UniformScalingDiscreteOp(λ,n)
+        @test size(Uop) == (n,n) 
+        @test UniformScaling(λ)*x == λ*x == Uop*x
+        @test UniformScaling(λ) == Nystrom.materialize(Uop)
+        y = Uop*x
+        @test a*λ*x+b*y == mul!(y,Uop,x,a,b) == y
+    end
 
     @testset "DiscreteOp test" begin
         @test size(A) == size(Aop)
         @test A*x == Aop*x
         @test A == Nystrom.materialize(Aop)
+        y = A*x
+        @test a*A*x+b*y ≈ mul!(y,Aop,x,a,b) == y
     end
 
     @testset "CompositeDiscreteOp test" begin
@@ -34,6 +48,9 @@ Random.seed!(1)
         @test length((Cop*Bop*Aop).maps) == 3
         @test C*(B*(A*x)) == Cop*Bop*Aop*x == Cop*Bop*(Aop*x) == Cop*(Bop*Aop)*x
         @test C*(B*A) == Nystrom.materialize(Cop*Bop*Aop)
+        op = Bop*Aop
+        y  = op*x
+        @test a*op*x+b*y ≈ mul!(y,op,x,a,b) == y
     end
 
     @testset "LinearCombinationDiscreteOp test" begin
@@ -44,12 +61,18 @@ Random.seed!(1)
         @test size(α*A - B + α*B) == size(α*Aop - Bop + α*Bop)
         @test (α*(A*x) - B*x + α*(B*x)) == (α*Aop - Bop + α*Bop)*x
         @test (α*A - B + α*B) == Nystrom.materialize(α*Aop - Bop + α*Bop)
+        op = α*Aop-Bop+α*Bop
+        y  = op*x
+        @test a*op*x+b*y ≈ mul!(y,op,x,a,b) == y
     end
 
     @testset "Mixed tests" begin
         @test size(C*α*(α*I+B-α*A)+(1-α)*C) == size(Cop*α*(α*I+Bop-α*Aop)+(1-α)*Cop)
-        @test C*(α*(α*x+B*x-α*(A*x)))+(1-α)*(C*x) == (Cop*α*(α*I+Bop-α*Aop)+(1-α)*Cop)*x
+        @test C*(α*(α*x+B*x-α*(A*x)))+(1-α)*(C*x) ≈ (Cop*α*(α*I+Bop-α*Aop)+(1-α)*Cop)*x
         @test C*(α*(α*I+B-α*A))+(1-α)*C == Nystrom.materialize(Cop*α*(α*I+Bop-α*Aop)+(1-α)*Cop)
+        op = (Bop*α*(α*I+Bop-α*Aop)+(1-α)*Bop)
+        y  = op*x
+        @test a*op*x+b*y ≈ mul!(y,op,x,a,b) == y
     end
 
     @testset "GMRES and LU tests" begin
