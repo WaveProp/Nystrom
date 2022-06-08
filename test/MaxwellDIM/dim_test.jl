@@ -7,14 +7,14 @@ using Nystrom.SparseArrays
 
 @testset "Stratton-Chu" begin
     rtol=5e-2
-    Geometry.clear_entities!()
-    Ω   = ParametricSurfaces.Sphere(;radius=3) |> Geometry.Domain
+    clear_entities!()
+    Ω   = ParametricSurfaces.Sphere(;radius=3) |> Domain
     Γ   = boundary(Ω)
     M   = ParametricSurfaces.meshgen(Γ,(4,4))
     mesh = NystromMesh(view(M,Γ),order=3)
     xs = SVector(0.1,-0.1,0.2)
     pde = Maxwell(;k=1)
-        
+
     V    = Nystrom.default_density_eltype(pde)
     c    = rand(V)
     γ₀    = (qnode) -> MaxwellDIM.EFIEKernel(pde)(qnode,xs)*c

@@ -1,6 +1,6 @@
 abstract type AbstractPDE{N} end
 
-Geometry.ambient_dimension(::AbstractPDE{N}) where {N} = N
+ambient_dimension(::AbstractPDE{N}) where {N} = N
 
 """
     abstract type AbstractKernel{T}

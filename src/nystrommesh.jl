@@ -15,7 +15,7 @@ coords(dof::NystromDOF)   = dof.coords
 center(dof::NystromDOF)   = dof.coords
 weight(dof::NystromDOF)   = dof.weight
 jacobian(dof::NystromDOF) = dof.jacobian
-normal(dof::NystromDOF)   = normal(jacobian(dof))
+normal(dof::NystromDOF)   = WavePropBase._normal(jacobian(dof))
 
 function NystromDOF(q::SVector{N,T},w::T,jac::SMatrix{N,_,T}) where {N,_,T}
     NystromDOF{N,T}(q,w,jac)
@@ -29,7 +29,7 @@ function Base.show(io::IO,dof::NystromDOF)
         globidx = $(dof.globidx)")
 end
 
-Interpolation.HyperRectangle(qnodes::Vector{<:NystromDOF}) = HyperRectangle(coords(q) for q in qnodes)
+HyperRectangle(qnodes::Vector{<:NystromDOF}) = HyperRectangle(coords(q) for q in qnodes)
 
 """
     struct NystromMesh{N,T} <: AbstractMesh{N,T}
@@ -79,12 +79,12 @@ qnormals(m::NystromMesh)   = (normal(q) for q in dofs(m))
 Compute `∑ᵢ f(xᵢ)wᵢ`, where the `xᵢ` are the `dofs` of `msh`, and `wᵢ` are its
 `qweights`.
 """
-function Integration.integrate(f,msh::NystromMesh)
-    Integration.integrate(f,dofs(msh),qweights(msh))
+function integrate(f,msh::NystromMesh)
+    integrate(f,dofs(msh),qweights(msh))
 end
 
 # entities and domain
-Geometry.entities(mesh::NystromMesh) = collect(keys(mesh.ent2elt))
+entities(mesh::NystromMesh) = collect(keys(mesh.ent2elt))
 domain(mesh::NystromMesh)            = Domain(entities(mesh))
 
 Base.keys(m::NystromMesh) = keys(elements(m))

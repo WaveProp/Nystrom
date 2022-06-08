@@ -13,9 +13,9 @@ Random.seed!(1)
     nsample = 20
     order = (3,3,3)
 
-    Geometry.clear_entities!()
+    clear_entities!()
     geo = ParametricSurfaces.Sphere(;radius=1)
-    Ω = Geometry.Domain(geo)
+    Ω = Domain(geo)
     Γ = boundary(Ω)
     M = Nystrom.meshgen(Γ,(4,4))
 
@@ -35,9 +35,9 @@ Random.seed!(1)
             Kpot = MaxwellDIM.potential_kernel(K)
             compress = ifgf_compressor(;order)
             L = compress(iop)
-    
+
             exa = [sum(cross(xn[i],Kpot(Xpts[i],Ypts[j])*(yw[j]*B[j])) for j in 1:npts) for i in J]
-    
+
             y = similar(B)
             mul!(y,L,B)
             er = norm(y[J]-exa) / norm(exa) # relative error

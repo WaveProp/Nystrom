@@ -15,7 +15,7 @@ Random.seed!(1)
     nsample = 20    # number of points to measure the error
 
     # geometry
-    Geometry.clear_entities!()
+    clear_entities!()
     geo = ParametricSurfaces.Sphere(;radius=1)
     Ω   = ParametricSurfaces.Domain(geo)
     Γ   = boundary(Ω)

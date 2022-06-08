@@ -5,13 +5,35 @@ using LinearAlgebra
 using ForwardDiff # for computing derivatives of parametric elements
 using RecipesBase
 
-using WavePropBase
-using WavePropBase.Utils
-using WavePropBase.Geometry
-using WavePropBase.Interpolation
-using WavePropBase.Mesh
-
-WavePropBase.@import_interface
+import WavePropBase:
+    HyperRectangle,
+    AbstractEntity,
+    AbstractElement,
+    Domain,
+    GenericMesh,
+    ElementIterator,
+    UniformCartesianMesh,
+    geometric_dimension,
+    ambient_dimension,
+    new_tag,
+    global_add_entity!,
+    boundary,
+    entities,
+    clear_entities!,
+    center,
+    normal,
+    assert_concrete_type,
+    ReferenceSquare,
+    ReferenceLine,
+    ElementaryEntity,
+    skeleton,
+    internal_boundary,
+    external_boundary,
+    jacobian,
+    mesh,
+    domain,
+    low_corner,
+    high_corner
 
 export
     # re-exported from WavePropBase for convenience

@@ -9,6 +9,8 @@ using QuadGK
 using RecipesBase
 using TimerOutputs
 using Base.Threads
+
+import WavePropBase
 import Lebedev  # to obtain the Lebedev points
 
 # module to handle some simple parametric geometries
@@ -16,27 +18,49 @@ include("ParametricSurfaces/ParametricSurfaces.jl")
 using .ParametricSurfaces
 
 # base utilities
-using WavePropBase
-using WavePropBase.Utils
-using WavePropBase.Geometry
-using WavePropBase.Interpolation
-using WavePropBase.Integration
-using WavePropBase.Mesh
-using WavePropBase.Trees
-WavePropBase.@import_interface
+import WavePropBase:
+    HyperRectangle,
+    AbstractMesh,
+    AbstractQuadratureRule,
+    AbstractElement,
+    AbstractEntity,
+    GenericMesh,
+    ElementIterator,
+    SubMesh,
+    entities,
+    integrate,
+    ambient_dimension,
+    geometric_dimension,
+    domain,
+    qrule_for_reference_shape,
+    low_corner,
+    high_corner,
+    jacobian,
+    integration_measure,
+    clear_entities!,
+    normal,
+    coords,
+    center,
+    diameter,
+    blockmatrix_to_matrix,
+    cross_product_matrix,
+    assert_concrete_type
+
 
 # Interpolated Factored Green Function Method
 import IFGF
 
 export
-    # re-export useful stuff
-    Geometry,
+    # re-exported from WavePropBase
+    clear_entities!,
+    Domain,
+    boundary,
+    #
     ParametricSurfaces,
     Laplace,
     Helmholtz,
     Elastostatic,
     Maxwell,
-    # types
     NystromMesh,
     NystromDOF,
     SingleLayerKernel,
@@ -60,8 +84,6 @@ export
     γ₀,
     γ₁,
     ifgf_compressor
-
-WavePropBase.@export_interface
 
 include("utils.jl")
 include("nystrommesh.jl")

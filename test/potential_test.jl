@@ -7,8 +7,8 @@ Random.seed!(1)
 @testset "Interior representation" begin
     # test the interior representation formula u(r) = 𝒮[γ₁u](r) - 𝒟[γ₀u](r)
     @testset "2d" begin
-        Geometry.clear_entities!()
-        Ω    = ParametricSurfaces.Disk() |> Geometry.Domain
+        clear_entities!()
+        Ω    = ParametricSurfaces.Disk() |> Domain
         Γ    = boundary(Ω)
         M    = ParametricSurfaces.meshgen(Γ,(10,))
         mesh = NystromMesh(view(M,Γ),order=5)
@@ -33,8 +33,8 @@ Random.seed!(1)
         end
     end
     @testset "3d" begin
-        Geometry.clear_entities!()
-        Ω  = ParametricSurfaces.Sphere() |> Geometry.Domain
+        clear_entities!()
+        Ω  = ParametricSurfaces.Sphere() |> Domain
         Γ    = boundary(Ω)
         M    = ParametricSurfaces.meshgen(Γ,(4,4))
         mesh = NystromMesh(view(M,Γ),order=5)
@@ -63,8 +63,8 @@ end
 @testset "Exterior representation" begin
     # test the exterior representation formula -u(r) = 𝒮[γ₁u](r) - 𝒟[γ₀u](r)
     @testset "2d" begin
-        Geometry.clear_entities!()
-        Ω  = ParametricSurfaces.Disk() |> Geometry.Domain
+        clear_entities!()
+        Ω  = ParametricSurfaces.Disk() |> Domain
         Γ    = boundary(Ω)
         M    = ParametricSurfaces.meshgen(Γ,(10,))
         mesh = NystromMesh(view(M,Γ),order=5)
@@ -89,8 +89,8 @@ end
         end
     end
     @testset "3d" begin
-        Geometry.clear_entities!()
-        Ω  = ParametricSurfaces.Sphere() |> Geometry.Domain
+        clear_entities!()
+        Ω  = ParametricSurfaces.Sphere() |> Domain
         Γ    = boundary(Ω)
         M    = ParametricSurfaces.meshgen(Γ,(4,4))
         mesh = NystromMesh(view(M,Γ),order=5)

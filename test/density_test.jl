@@ -3,14 +3,15 @@ using StaticArrays
 using Random
 using Nystrom
 using LinearAlgebra
+using Nystrom: boundary, clear_entities!, normal
 Random.seed!(1)
 
 @testset "Density test" begin
     # Scalar case
-    Geometry.clear_entities!()
+    Nystrom.clear_entities!()
     pde   = Helmholtz(;dim=3,k=1)
     Ω     = ParametricSurfaces.Sphere()
-    Γ     = boundary(Ω) |> Geometry.Domain
+    Γ     = Nystrom.boundary(Ω) |> Nystrom.Domain
     M     = ParametricSurfaces.meshgen(Γ,(10,10))
     mesh  = NystromMesh(view(M,Γ),order=1)
     σ     = Density(target->norm(coords(target)),mesh)
@@ -30,8 +31,8 @@ Random.seed!(1)
     @test length(μ) == ndof
 
     # Tensor Case
-    Geometry.clear_entities!()
-    Ω   = ParametricSurfaces.Sphere(;radius=1) |> Geometry.Domain
+    Nystrom.clear_entities!()
+    Ω   = ParametricSurfaces.Sphere(;radius=1) |> Nystrom.Domain
     Γ   = boundary(Ω)
     M   = ParametricSurfaces.meshgen(Γ,(2,2))
     mesh = NystromMesh(view(M,Γ),order=2)

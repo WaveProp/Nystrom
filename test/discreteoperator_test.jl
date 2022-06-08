@@ -70,8 +70,8 @@ Random.seed!(1)
 
     @testset "GMRES and LU tests" begin
         # mesh
-        Geometry.clear_entities!()
-        Ω = ParametricSurfaces.Sphere(;radius=1) |> Geometry.Domain
+        clear_entities!()
+        Ω = ParametricSurfaces.Sphere(;radius=1) |> Domain
         Γ = boundary(Ω)
         M = ParametricSurfaces.meshgen(Γ,(2,2))
         mesh = NystromMesh(view(M,Γ),order=1)

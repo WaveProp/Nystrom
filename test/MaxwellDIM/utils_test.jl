@@ -6,8 +6,8 @@ using Nystrom.SparseArrays
 using Nystrom.MaxwellDIM
 
 @testset "Utils" begin
-    Geometry.clear_entities!()
-    Ω   = ParametricSurfaces.Sphere(;radius=3) |> Geometry.Domain
+    clear_entities!()
+    Ω   = ParametricSurfaces.Sphere(;radius=3) |> Domain
     Γ   = boundary(Ω)
     M   = ParametricSurfaces.meshgen(Γ,(2,2))
     qnumber = 3   # per dimension per patch
@@ -45,13 +45,13 @@ using Nystrom.MaxwellDIM
         dofs_per_qnode = 4
         n = 11*dofs_per_qnode
         T = ComplexF64
-    
+
         A = rand(T,n,n)
         x = rand(SVector{dofs_per_qnode,T},n)
         xr = reinterpret(T,x)
         y = deepcopy(x)
         b = A*x
-    
+
         As = MaxwellDIM.Scalar2VectorOp(A;dofs_per_qnode)
         @test As*xr ≈ reinterpret(T,b)
         @test As*x ≈ b

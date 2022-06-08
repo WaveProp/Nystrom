@@ -9,8 +9,8 @@ Random.seed!(1)
     # construct interior solution
     rtol=5e-2
     @testset "Greens identity (interior) 2d" begin
-        Geometry.clear_entities!()
-        Ω   = ParametricSurfaces.Disk() |> Geometry.Domain
+        clear_entities!()
+        Ω   = ParametricSurfaces.Disk() |> Domain
         Γ   = boundary(Ω)
         M   = ParametricSurfaces.meshgen(Γ,(5,))
         mesh = NystromMesh(view(M,Γ),order=3)
@@ -59,8 +59,8 @@ Random.seed!(1)
     end
 
     @testset "Greens identity (interior) 3d" begin
-        Geometry.clear_entities!()
-        Ω   = ParametricSurfaces.Sphere(;radius=1) |> Geometry.Domain
+        clear_entities!()
+        Ω   = ParametricSurfaces.Sphere(;radius=1) |> Domain
         Γ   = boundary(Ω)
         M   = ParametricSurfaces.meshgen(Γ,(2,2))
         mesh = NystromMesh(view(M,Γ),order=3)
@@ -109,8 +109,8 @@ Random.seed!(1)
     end
 
     @testset "Greens identity (exterior) 2d" begin
-        Geometry.clear_entities!()
-        Ω   = ParametricSurfaces.Disk() |> Geometry.Domain
+        clear_entities!()
+        Ω   = ParametricSurfaces.Disk() |> Domain
         Γ   = boundary(Ω)
         M   = ParametricSurfaces.meshgen(Γ,(7,))
         mesh = NystromMesh(view(M,Γ),order=3)
@@ -159,8 +159,8 @@ Random.seed!(1)
     end
 
     @testset "Greens identity (exterior) 3d" begin
-        Geometry.clear_entities!()
-        Ω   = ParametricSurfaces.Sphere(;radius=3) |> Geometry.Domain
+        clear_entities!()
+        Ω   = ParametricSurfaces.Sphere(;radius=3) |> Domain
         Γ   = boundary(Ω)
         M   = ParametricSurfaces.meshgen(Γ,(4,4))
         mesh = NystromMesh(view(M,Γ),order=3)
